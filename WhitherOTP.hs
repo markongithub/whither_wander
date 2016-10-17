@@ -7,7 +7,7 @@ import Data.ByteString.Lazy.Internal (packChars)
 import Data.List (intercalate, minimumBy)
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
-import Data.Time.Clock (UTCTime(..))
+import Data.Time.Clock (diffUTCTime, UTCTime(..))
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Time.LocalTime (TimeZone(..), utcToZonedTime)
@@ -119,6 +119,7 @@ data OTPLeg = OTPLeg { lStartTime :: UTCTime,
                        lFrom :: OTPPlace,
                        lTo :: OTPPlace,
                        lTripBlockID :: Maybe String,
+                       lHeadSign :: Maybe String,
                        lRoute :: String,
                        lMode :: String}
 
@@ -129,6 +130,7 @@ instance FromJSON OTPLeg where
            <*> v .: pack "from"
            <*> v .: pack "to"
            <*> v .:? pack "tripBlockId"
+           <*> v .:? pack "headsign"
            <*> v .: pack "route"
            <*> v .: pack "mode"
   parseJSON _ = mzero
@@ -144,6 +146,59 @@ instance Show OTPLeg where
       "WALK" -> timestamp ++ walkText ++ commonText
       "RAIL" -> timestamp ++ railText ++ commonText
       _      -> ("What the hell is " ++ lMode leg)
+
+trainName :: OTPLeg -> String
+trainName leg = fromMaybe "[numberless]" (lTripBlockID leg)
+
+sameTrain :: OTPLeg -> OTPLeg -> Bool
+sameTrain l1 l2 = case (lTripBlockID l1, lTripBlockID l2) of
+  -- If for some reason either train doesn't have a blockID we just have to
+  -- assume they are different trains. Maybe this information is properly
+  -- encoded by OTP but I am not looking into that now.
+  (Nothing, _) -> False
+  (_, Nothing) -> False
+  (Just i1, Just i2) -> i1 == i2
+
+showDeparture :: OTPLeg -> String
+showDeparture leg =
+  let commonText = "From " ++ (pName $ lFrom leg) ++ ", "
+      railText = "take train " ++ trainName leg ++ " on " ++ routeDesc leg
+      walkText = "start walking toward " ++ (pName $ lTo leg)
+      timestamp = timeHeading leg
+  in case (lMode leg) of
+    "WALK" -> timestamp ++ commonText ++ walkText
+    "RAIL" -> timestamp ++ commonText ++ railText
+    _      -> ("What the shit is " ++ lMode leg)
+
+showArrival :: OTPLeg -> String
+showArrival leg = (displayTime $ lEndTime leg) ++ ": Arrive at " ++ (pName $ lTo leg) ++ "."
+
+showLayover :: OTPLeg -> OTPLeg -> String
+showLayover l1 l2 = " Kill " ++ (show minutes) ++ " minutes at " ++ (pName $ lFrom l2) ++ "."
+  where minutes = quot (ceiling $ diffUTCTime (lStartTime l2) (lEndTime l1)) 60
+
+timeHeading :: OTPLeg -> String
+timeHeading leg = (displayTime $ lStartTime leg) ++ ": "
+
+routeDesc :: OTPLeg -> String
+routeDesc leg = "the " ++ lRoute leg ++ " bound for " ++ (fromMaybe "no head sign WTF" $ lHeadSign leg)
+
+showLegs :: [OTPLeg] -> [String]
+showLegs [] = []
+showLegs (l:[]) = [showDeparture l, showArrival l]
+showLegs (l1:(l2:xs))
+-- if l1 is rail and l2 is rail and they are the same train
+-- let's say the departure, no arrival, and "stay on the train" then recurse xs
+  | sameTrain l1 l2 = [showDeparture l1, timeHeading l2 ++ "Stay on the train as it becomes the " ++ routeDesc l2, showArrival l2] ++ showLegs xs
+-- if l1 is rail and l2 is rail and they are different trains, let's show
+-- l1, the arrival+killing, and recurse l2:xs
+  | (lMode l1 == "RAIL") && (lMode l2 == "RAIL") = [showDeparture l1, showArrival l1 ++ showLayover l1 l2] ++ showLegs (l2:xs)
+-- if l1 leg is rail and l2 is walking, let's give the l1 departure and arrival
+  | (lMode l1) == "RAIL" && (lMode l2) == "WALK" = [showDeparture l1, showArrival l1] ++ showLegs (l2:xs)
+-- if l1 is walking, let's give the walking then the arrival+killing
+-- then recurse on l2:xs
+  | (lMode l1 == "WALK") = [showDeparture l1, showArrival l1 ++ showLayover l1 l2] ++ showLegs (l2:xs)
+  | otherwise = error "I have no idea what I am doing."
 
 data OTPPlace = OTPPlace { pName :: String } deriving Show
 

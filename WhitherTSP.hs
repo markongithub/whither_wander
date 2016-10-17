@@ -1,6 +1,7 @@
 module WhitherTSP where
   import qualified Data.Set as Set
   import Control.Monad (liftM)
+  import Data.List (intercalate)
   import Data.Time.Clock (addUTCTime, UTCTime(..))
   import System.Environment (getArgs)
   import WhitherOTP
@@ -102,7 +103,10 @@ module WhitherTSP where
     permOutcome = permAtIndex alwaysTrue set index
     in do
       (_, outcome) <- judgePermutation otp planFlags startTime deadline (index, permOutcome)
-      putStr $ concat $ map (\l -> (show l ++ "\n")) $ legsSoFar $ finalState outcome
+      case permOutcome of
+        Permutation stops -> putStrLn ("Order of stops: " ++ show stops)
+        _ -> error "this should never happen"
+      putStr $ intercalate "\n" $ showLegs $ legsSoFar $ finalState outcome
 
   printEach :: (Show t) => [IO t] -> IO()
   printEach [] = return ()
