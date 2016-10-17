@@ -62,15 +62,24 @@ parseResponse text =
     Left msg -> error ("Decoding failed because " ++ msg ++ " when trying to decode " ++ text)
     Right obj -> obj
 
+data OTPError = OTPError String deriving Show
+
+instance FromJSON OTPError where
+  parseJSON (Object v) =
+    OTPError <$> v .: pack "msg"
+  parseJSON _ = mzero
+
 data OTPResponse =
-  OTPResponse { plan :: OTPTripPlan,
+  OTPResponse { plan :: Maybe OTPTripPlan,
+                otpError :: Maybe OTPError,
                 requestParameters :: Object } deriving Show
 
 instance FromJSON OTPResponse where
- parseJSON (Object v) =
-    OTPResponse <$> v .: pack "plan"
+  parseJSON (Object v) =
+    OTPResponse <$> v .:? pack "plan"
+                <*> v .:? pack "error"
                 <*> v .: pack "requestParameters"
- parseJSON _ = mzero
+  parseJSON _ = mzero
 
 data OTPTripPlan = OTPTripPlan { itineraries :: [OTPItinerary] } deriving Show
 
@@ -95,8 +104,15 @@ fastestItinerary plan = let
   faster x y = compare (iEndTime x) (iEndTime y)
   in minimumBy faster (itineraries plan)
 
-getFastestItinerary :: OTPImpl s => s -> String -> String -> UTCTime -> [String] -> IO OTPItinerary
-getFastestItinerary a b c d e = liftM fastestItinerary $ getPlan a b c d e
+getFastestItinerary :: OTPImpl s => s -> String -> String -> UTCTime -> [String] -> IO (Either OTPError OTPItinerary)
+getFastestItinerary otp from to travelTime planFlags = do
+  response <- getRouteJSON otp from to travelTime planFlags
+  let parsed = parseResponse response
+  case (plan parsed) of
+    Just rPlan -> return $ Right (fastestItinerary rPlan)
+    _          -> case (otpError parsed) of
+                    Just e -> return $ Left e
+                    _      -> error "No plan OR error came back from OTP."
 
 data OTPLeg = OTPLeg { lStartTime :: UTCTime,
                        lEndTime :: UTCTime,
@@ -135,7 +151,3 @@ instance FromJSON OTPPlace where
   parseJSON (Object v) =
     OTPPlace <$> v .: pack "name"
   parseJSON _ = mzero
-
-getPlan :: OTPImpl s => s -> String -> String -> UTCTime -> [String] -> IO OTPTripPlan
-getPlan otp from to travelTime planFlags = liftM (plan . parseResponse) $ getRouteJSON otp from to travelTime planFlags
-

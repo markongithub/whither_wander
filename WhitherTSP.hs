@@ -43,11 +43,15 @@ module WhitherTSP where
   followDestinations0 :: OTPImpl a => a -> PlanFlagMaker -> [Station] -> UTCTime -> TSPState -> IO Outcome
   followDestinations0 _ _ [] _ state =
     return Outcome {verdict = Success, nodesLeft=0, message=show state, finalState=state}
-  followDestinations0 otp planFlags (nextDest:remaining) deadline state =
-    let itinerary = getFastestItinerary otp (code $ currentLocation state) (code nextDest) (currentTime state) (planFlags state)
-    in do
-      nextState <- liftM (followItinerary state nextDest) itinerary
-      if ((currentTime nextState) > deadline)
+  followDestinations0 otp planFlags (nextDest:remaining) deadline state = do
+    response <- getFastestItinerary otp (code $ currentLocation state) (code nextDest) (currentTime state) (planFlags state)
+    case response of
+      Left (OTPError msg) -> return Outcome{
+        verdict=Failure, nodesLeft=(1 + length remaining),
+        message="No route from " ++ (show $ currentLocation state) ++ " to " ++ (show nextDest) ++ " at " ++ displayTime ((currentTime state)), finalState=state}
+      Right itinerary -> do
+        let nextState = followItinerary state nextDest itinerary
+        if ((currentTime nextState) > deadline)
         then return Outcome {verdict=Failure, nodesLeft=(1 + length remaining),
                              message="Ran out of time. " ++ show nextState,
                              finalState = nextState}
