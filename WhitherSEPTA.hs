@@ -48,7 +48,7 @@ module Main where
 
   allSEPTATests = chainTests chestnutHillTest jenkintownTest
 
-  myStartTime = UTCTime (fromGregorian 2013 2 22) (8*60*60) -- 8 AM UTC = 4 AM EDT
+  myStartTime = UTCTime (fromGregorian 2016 10 14) (8*60*60) -- 8 AM UTC = 4 AM EDT
   myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 
   main :: IO()

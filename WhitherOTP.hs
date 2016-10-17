@@ -20,10 +20,10 @@ convertMillis :: Int -> UTCTime
 convertMillis ms = posixSecondsToUTCTime (fromIntegral $ quot ms 1000)
 
 queryTime :: UTCTime -> String
-queryTime utc = formatTime defaultTimeLocale "&date=%Y%m%d&time=%H:%M" (utcToZonedTime failEST utc)
+queryTime utc = formatTime defaultTimeLocale "&date=%Y%m%d&time=%H:%M" (utcToZonedTime failEDT utc)
 
 displayTime :: UTCTime -> String
-displayTime utc = formatTime defaultTimeLocale "%Y%m%d-%H%M %Z" (utcToZonedTime failEST utc)
+displayTime utc = formatTime defaultTimeLocale "%Y%m%d-%H%M %Z" (utcToZonedTime failEDT utc)
 
 data OTPHTTPServer = OTPHTTPServer String
 routerAddress = "http://localhost:8080/otp/routers/default/"
