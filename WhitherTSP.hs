@@ -45,7 +45,7 @@ module WhitherTSP where
   followDestinations0 _ _ [] _ state =
     return Outcome {verdict = Success, nodesLeft=0, message=show state, finalState=state}
   followDestinations0 otp planFlags (nextDest:remaining) deadline state = do
-    response <- getFastestItinerary otp (code $ currentLocation state) (code nextDest) (currentTime state) (planFlags state)
+    response <- getFastestItinerary otp (OTPPlanRequest (code $ currentLocation state) (code nextDest) (currentTime state) (planFlags state))
     case response of
       Left (OTPError msg) -> return Outcome{
         verdict=Failure, nodesLeft=(1 + length remaining),

@@ -30,26 +30,32 @@ routerAddress = "http://localhost:8080/otp/routers/default/"
 
 defaultOTP = OTPHTTPServer routerAddress
 
-queryURL :: String -> String -> String -> UTCTime -> [String] -> String
-queryURL routerAddress fromCode toCode travelTime planFlags
+data OTPPlanRequest = OTPPlanRequest {
+  fromStationCode :: String,
+  toStationCode :: String,
+  departureTime :: UTCTime,
+  additionalFlags :: [String] } deriving (Eq, Ord, Show)
+
+queryURL :: String -> OTPPlanRequest -> String
+queryURL routerAddress (OTPPlanRequest fromCode toCode travelTime planFlags)
   | otherwise = url
   where url = routerAddress ++ "plan?minTransferTime=180&fromPlace=" ++ fromCode ++ "&toPlace=" ++ toCode ++ queryTime travelTime ++ extraParams
         extraParams = "&" ++ intercalate "&" planFlags
 
-getRouteHTTP :: OTPHTTPServer -> String -> String -> UTCTime -> [String] -> IO String
-getRouteHTTP (OTPHTTPServer routerAddress) fromStation toStation travelTime planFlags =
-  let url = queryURL routerAddress fromStation toStation travelTime planFlags
+getRouteHTTP :: OTPHTTPServer -> OTPPlanRequest -> IO String
+getRouteHTTP (OTPHTTPServer routerAddress) request =
+  let url = queryURL routerAddress request
   in simpleHTTP (getRequest url) >>= getResponseBody
 
 class OTPImpl a where
-  getRouteJSON :: a -> String -> String -> UTCTime -> [String] -> IO String
+  getRouteJSON :: a -> OTPPlanRequest -> IO String
 
 instance OTPImpl OTPHTTPServer where
   getRouteJSON server = getRouteHTTP server
 
 data StaticFileReader = StaticFileReader
 instance OTPImpl StaticFileReader where
-  getRouteJSON _ _ _ _ _ = readFile "route.json"
+  getRouteJSON _ _ = readFile "route.json"
 
 sampleResponse :: IO OTPResponse
 sampleResponse = liftM parseResponse $ readFile "route.json"
@@ -104,15 +110,18 @@ fastestItinerary plan = let
   faster x y = compare (iEndTime x) (iEndTime y)
   in minimumBy faster (itineraries plan)
 
-getFastestItinerary :: OTPImpl s => s -> String -> String -> UTCTime -> [String] -> IO (Either OTPError OTPItinerary)
-getFastestItinerary otp from to travelTime planFlags = do
-  response <- getRouteJSON otp from to travelTime planFlags
+type OTPItineraryOrNot = Either OTPError OTPItinerary
+
+getFastestItinerary :: OTPImpl s => s -> OTPPlanRequest -> IO OTPItineraryOrNot
+getFastestItinerary otp request = do
+  response <- getRouteJSON otp request
   let parsed = parseResponse response
   case (plan parsed) of
     Just rPlan -> return $ Right (fastestItinerary rPlan)
     _          -> case (otpError parsed) of
                     Just e -> return $ Left e
                     _      -> error "No plan OR error came back from OTP."
+
 
 data OTPLeg = OTPLeg { lStartTime :: UTCTime,
                        lEndTime :: UTCTime,
