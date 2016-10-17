@@ -2,6 +2,7 @@ module WhitherTSP where
   import qualified Data.Set as Set
   import Control.Monad (liftM)
   import Data.List (intercalate)
+  import Data.Map as Map (Map, empty)
   import Data.Time.Clock (addUTCTime, UTCTime(..))
   import System.Environment (getArgs)
   import WhitherOTP
@@ -19,9 +20,16 @@ module WhitherTSP where
       in intro ++ message outcome
 
   data Verdict = Success | Failure deriving (Eq, Show)
+
+  type ItineraryCache = Map.Map OTPPlanRequest OTPItineraryOrNot
+
+  newCache :: ItineraryCache
+  newCache = Map.empty
+
   data TSPState = TSPState { currentTime :: UTCTime
                            , currentLocation :: Station
                            , legsSoFar :: [OTPLeg]
+                           , cache :: ItineraryCache
                            }
 
   instance Show TSPState where
@@ -31,14 +39,14 @@ module WhitherTSP where
 
   followItinerary :: TSPState -> Station -> OTPItinerary -> TSPState
   followItinerary curState nextDestination itin =
-    TSPState { currentTime = (addUTCTime 60 (iEndTime itin))
+    curState { currentTime = (addUTCTime 60 (iEndTime itin))
              , currentLocation = nextDestination 
              , legsSoFar = (legsSoFar curState) ++ (legs itin)}
 
-  followDestinations :: OTPImpl a => a -> PlanFlagMaker -> [Station] -> UTCTime -> UTCTime -> IO Outcome
-  followDestinations otp planFlags [] utc deadline = error "why would you have no destinations?"
-  followDestinations otp planFlags (startPlace:remaining) utc deadline =
-    let firstState = TSPState{currentLocation=startPlace, currentTime=utc, legsSoFar=[]}
+  followDestinations :: OTPImpl a => a -> PlanFlagMaker -> [Station] -> UTCTime -> UTCTime -> ItineraryCache -> IO Outcome
+  followDestinations otp planFlags [] utc deadline iCache = error "why would you have no destinations?"
+  followDestinations otp planFlags (startPlace:remaining) utc deadline iCache =
+    let firstState = TSPState{currentLocation=startPlace, currentTime=utc, legsSoFar=[], cache=iCache}
     in followDestinations0 otp planFlags remaining deadline firstState
 
   followDestinations0 :: OTPImpl a => a -> PlanFlagMaker -> [Station] -> UTCTime -> TSPState -> IO Outcome
@@ -69,10 +77,10 @@ module WhitherTSP where
   instance Show Station where
     show station = name station
 
-  judgePermutation :: OTPImpl a => a -> PlanFlagMaker -> UTCTime -> UTCTime -> (Int, PermutationOutcome Station) -> IO (Int, Outcome)
-  judgePermutation otp planFlags startTime deadline (index, testOutput) = case testOutput of
+  judgePermutation :: OTPImpl a => a -> PlanFlagMaker -> UTCTime -> UTCTime -> (Int, PermutationOutcome Station) -> ItineraryCache -> IO (Int, Outcome)
+  judgePermutation otp planFlags startTime deadline (index, testOutput) iCache = case testOutput of
     Permutation stops -> do
-      outcome <- followDestinations otp planFlags stops startTime deadline
+      outcome <- followDestinations otp planFlags stops startTime deadline iCache
       return (index, outcome)
     PermutationFailure msg x -> return
       (index, Outcome{verdict=Failure, nodesLeft=x, message=msg, finalState=error "I implemented this poorly"})
@@ -91,7 +99,7 @@ module WhitherTSP where
   judgeEach :: OTPImpl a => a -> PlanFlagMaker -> UTCTime -> UTCTime -> [(Int, PermutationOutcome Station)] -> IO ()
   judgeEach otp planFlags startTime deadline [] = return ()
   judgeEach otp planFlags startTime deadline (x:xs) = do
-    (index, outcome) <- judgePermutation otp planFlags startTime deadline x
+    (index, outcome) <- judgePermutation otp planFlags startTime deadline x newCache
     putStrLn (show (index, outcome))
     let nextIndex = case (verdict outcome) of Failure -> nextMultiple index (factorial $ nodesLeft outcome)
                                               _ -> index + 1
@@ -102,7 +110,7 @@ module WhitherTSP where
   printTSPAtIndex set otp planFlags startTime deadline index = let
     permOutcome = permAtIndex alwaysTrue set index
     in do
-      (_, outcome) <- judgePermutation otp planFlags startTime deadline (index, permOutcome)
+      (_, outcome) <- judgePermutation otp planFlags startTime deadline (index, permOutcome) newCache
       case permOutcome of
         Permutation stops -> putStrLn ("Order of stops: " ++ show stops)
         _ -> error "this should never happen"
