@@ -17,7 +17,7 @@ failEDT = TimeZone (-4 * 60) True "failEDT"
 failEST = TimeZone (-5 * 60) True "failEST"
 
 convertMillis :: Int -> UTCTime
-convertMillis us = posixSecondsToUTCTime (fromIntegral $ quot ms 1000)
+convertMillis ms = posixSecondsToUTCTime (fromIntegral $ quot ms 1000)
 
 queryTime :: UTCTime -> String
 queryTime utc = formatTime defaultTimeLocale "&date=%Y%m%d&time=%H:%M" (utcToZonedTime failEST utc)
