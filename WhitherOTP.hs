@@ -16,8 +16,8 @@ import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
 failEDT = TimeZone (-4 * 60) True "failEDT"
 failEST = TimeZone (-5 * 60) True "failEST"
 
-convertMicros :: Int -> UTCTime
-convertMicros us = posixSecondsToUTCTime (fromIntegral $ quot us 1000)
+convertMillis :: Int -> UTCTime
+convertMillis us = posixSecondsToUTCTime (fromIntegral $ quot us 1000)
 
 queryTime :: UTCTime -> String
 queryTime utc = formatTime defaultTimeLocale "&date=%Y%m%d&time=%H:%M" (utcToZonedTime failEST utc)
@@ -85,8 +85,8 @@ data OTPItinerary = OTPItinerary { iStartTime :: UTCTime,
 
 instance FromJSON OTPItinerary where
   parseJSON (Object v) =
-    OTPItinerary <$> (convertMicros <$> (v .: pack "startTime"))
-                 <*> (convertMicros <$> (v .: pack "endTime"))
+    OTPItinerary <$> (convertMillis <$> (v .: pack "startTime"))
+                 <*> (convertMillis <$> (v .: pack "endTime"))
                  <*> v .: pack "legs"
   parseJSON _ = mzero
 
@@ -108,8 +108,8 @@ data OTPLeg = OTPLeg { lStartTime :: UTCTime,
 
 instance FromJSON OTPLeg where
   parseJSON (Object v) =
-    OTPLeg <$> (convertMicros <$> (v .: pack "startTime"))
-           <*> (convertMicros <$> (v .: pack "endTime"))
+    OTPLeg <$> (convertMillis <$> (v .: pack "startTime"))
+           <*> (convertMillis <$> (v .: pack "endTime"))
            <*> v .: pack "from"
            <*> v .: pack "to"
            <*> v .:? pack "tripBlockId"
