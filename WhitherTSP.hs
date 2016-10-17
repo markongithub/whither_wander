@@ -79,7 +79,7 @@ module WhitherTSP where
 
   judgePermutations :: OTPImpl a => a -> PermutationTest b Station -> PlanFlagMaker -> UTCTime -> UTCTime -> Set.Set Station -> Int -> Int -> IO ()
   judgePermutations otp test planFlags startTime deadline set startIndex numToTry = let
-    perms = reverse $ tryPermutations test set startIndex numToTry
+    perms = tryPermutations test set startIndex numToTry
     in judgeEach otp planFlags startTime deadline perms
  
   dropWhileM :: Monad m => (a -> Bool) -> [m a] -> m [m a]
