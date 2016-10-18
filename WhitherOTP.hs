@@ -5,6 +5,7 @@ import Data.Aeson ((.:), (.:?), eitherDecode, FromJSON, parseJSON)
 import Data.Aeson.Types (Object, Value(..))
 import Data.ByteString.Lazy.Internal (packChars)
 import Data.List (intercalate, minimumBy)
+import Data.Map as Map (Map, empty, insert, lookup, size)
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Data.Time.Clock (diffUTCTime, UTCTime(..))
@@ -122,6 +123,21 @@ getFastestItinerary otp request = do
                     Just e -> return $ Left e
                     _      -> error "No plan OR error came back from OTP."
 
+type ItineraryCache = Map.Map OTPPlanRequest OTPItineraryOrNot
+
+emptyCache :: ItineraryCache
+emptyCache = Map.empty
+
+getFastestItineraryCaching :: OTPImpl s => s -> OTPPlanRequest -> ItineraryCache -> IO (OTPItineraryOrNot, ItineraryCache)
+getFastestItineraryCaching otp request iCache =
+  case Map.lookup request iCache of
+    Just hit -> do
+--      putStrLn ("Cache hit for " ++ show request ++ "!")
+      return (hit, iCache)
+    Nothing -> do
+--      putStrLn ("Cache miss for " ++ show request ++ " with " ++ show (Map.size iCache) ++ " elements in cache.")
+      response <- getFastestItinerary otp request
+      return (response, Map.insert request response iCache :: ItineraryCache)
 
 data OTPLeg = OTPLeg { lStartTime :: UTCTime,
                        lEndTime :: UTCTime,

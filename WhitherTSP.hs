@@ -2,7 +2,6 @@ module WhitherTSP where
   import qualified Data.Set as Set
   import Control.Monad (liftM)
   import Data.List (intercalate)
-  import Data.Map as Map (Map, empty)
   import Data.Time.Clock (addUTCTime, UTCTime(..))
   import System.Environment (getArgs)
   import WhitherOTP
@@ -20,11 +19,6 @@ module WhitherTSP where
       in intro ++ message outcome
 
   data Verdict = Success | Failure deriving (Eq, Show)
-
-  type ItineraryCache = Map.Map OTPPlanRequest OTPItineraryOrNot
-
-  newCache :: ItineraryCache
-  newCache = Map.empty
 
   data TSPState = TSPState { currentTime :: UTCTime
                            , currentLocation :: Station
@@ -53,13 +47,13 @@ module WhitherTSP where
   followDestinations0 _ _ [] _ state =
     return Outcome {verdict = Success, nodesLeft=0, message=show state, finalState=state}
   followDestinations0 otp planFlags (nextDest:remaining) deadline state = do
-    response <- getFastestItinerary otp (OTPPlanRequest (code $ currentLocation state) (code nextDest) (currentTime state) (planFlags state))
+    (response, newCache) <- getFastestItineraryCaching otp (OTPPlanRequest (code $ currentLocation state) (code nextDest) (currentTime state) (planFlags state)) (cache state) 
     case response of
       Left (OTPError msg) -> return Outcome{
         verdict=Failure, nodesLeft=(1 + length remaining),
-        message="No route from " ++ (show $ currentLocation state) ++ " to " ++ (show nextDest) ++ " at " ++ displayTime ((currentTime state)), finalState=state}
+        message="No route from " ++ (show $ currentLocation state) ++ " to " ++ (show nextDest) ++ " at " ++ displayTime ((currentTime state)), finalState=state{cache=newCache}}
       Right itinerary -> do
-        let nextState = followItinerary state nextDest itinerary
+        let nextState = followItinerary state{cache=newCache} nextDest itinerary
         if ((currentTime nextState) > deadline)
         then return Outcome {verdict=Failure, nodesLeft=(1 + length remaining),
                              message="Ran out of time. " ++ show nextState,
@@ -83,12 +77,12 @@ module WhitherTSP where
       outcome <- followDestinations otp planFlags stops startTime deadline iCache
       return (index, outcome)
     PermutationFailure msg x -> return
-      (index, Outcome{verdict=Failure, nodesLeft=x, message=msg, finalState=error "I implemented this poorly"})
+      (index, Outcome{verdict=Failure, nodesLeft=x, message=msg, finalState=TSPState{currentLocation=(Station "this code" "is terrible"), currentTime=startTime, legsSoFar=[], cache=iCache}})
 
   judgePermutations :: OTPImpl a => a -> PermutationTest b Station -> PlanFlagMaker -> UTCTime -> UTCTime -> Set.Set Station -> Int -> Int -> IO ()
   judgePermutations otp test planFlags startTime deadline set startIndex numToTry = let
     perms = tryPermutations test set startIndex numToTry
-    in judgeEach otp planFlags startTime deadline perms
+    in judgeEach otp planFlags startTime deadline perms emptyCache
  
   dropWhileM :: Monad m => (a -> Bool) -> [m a] -> m [m a]
   dropWhileM f [] = return []
@@ -96,21 +90,22 @@ module WhitherTSP where
      x <- (head list)
      if (f x) then (dropWhileM f (tail list)) else return list
 
-  judgeEach :: OTPImpl a => a -> PlanFlagMaker -> UTCTime -> UTCTime -> [(Int, PermutationOutcome Station)] -> IO ()
-  judgeEach otp planFlags startTime deadline [] = return ()
-  judgeEach otp planFlags startTime deadline (x:xs) = do
-    (index, outcome) <- judgePermutation otp planFlags startTime deadline x newCache
+  judgeEach :: OTPImpl a => a -> PlanFlagMaker -> UTCTime -> UTCTime -> [(Int, PermutationOutcome Station)] -> ItineraryCache -> IO ()
+  judgeEach otp planFlags startTime deadline [] _ = return ()
+  judgeEach otp planFlags startTime deadline (x:xs) iCache = do
+    (index, outcome) <- judgePermutation otp planFlags startTime deadline x iCache
     putStrLn (show (index, outcome))
+    let newCache = cache $ finalState outcome
     let nextIndex = case (verdict outcome) of Failure -> nextMultiple index (factorial $ nodesLeft outcome)
                                               _ -> index + 1
     let newPerms = dropWhile (\(i, _) -> i < nextIndex) xs
-    judgeEach otp planFlags startTime deadline newPerms
+    judgeEach otp planFlags startTime deadline newPerms newCache
 
   printTSPAtIndex :: OTPImpl a => Set.Set Station -> a -> PlanFlagMaker -> UTCTime -> UTCTime -> Int -> IO()
   printTSPAtIndex set otp planFlags startTime deadline index = let
     permOutcome = permAtIndex alwaysTrue set index
     in do
-      (_, outcome) <- judgePermutation otp planFlags startTime deadline (index, permOutcome) newCache
+      (_, outcome) <- judgePermutation otp planFlags startTime deadline (index, permOutcome) emptyCache
       case permOutcome of
         Permutation stops -> putStrLn ("Order of stops: " ++ show stops)
         _ -> error "this should never happen"
