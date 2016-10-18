@@ -33,7 +33,7 @@ module WhitherTSP where
 
   followItinerary :: TSPState -> Station -> OTPItinerary -> TSPState
   followItinerary curState nextDestination itin =
-    curState { currentTime = (addUTCTime 60 (iEndTime itin))
+    curState { currentTime = (addUTCTime (fromIntegral minTransferTime) (iEndTime itin))
              , currentLocation = nextDestination 
              , legsSoFar = (legsSoFar curState) ++ (legs itin)}
 

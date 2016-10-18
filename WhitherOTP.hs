@@ -17,6 +17,8 @@ import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
 failEDT = TimeZone (-4 * 60) True "failEDT"
 failEST = TimeZone (-5 * 60) True "failEST"
 
+minTransferTime = 180
+
 convertMillis :: Int -> UTCTime
 convertMillis ms = posixSecondsToUTCTime (fromIntegral $ quot ms 1000)
 
@@ -40,7 +42,7 @@ data OTPPlanRequest = OTPPlanRequest {
 queryURL :: String -> OTPPlanRequest -> String
 queryURL routerAddress (OTPPlanRequest fromCode toCode travelTime planFlags)
   | otherwise = url
-  where url = routerAddress ++ "plan?minTransferTime=180&fromPlace=" ++ fromCode ++ "&toPlace=" ++ toCode ++ queryTime travelTime ++ extraParams
+  where url = routerAddress ++ "plan?minTransferTime=" ++ show minTransferTime ++ "&fromPlace=" ++ fromCode ++ "&toPlace=" ++ toCode ++ queryTime travelTime ++ extraParams
         extraParams = "&" ++ intercalate "&" planFlags
 
 getRouteHTTP :: OTPHTTPServer -> OTPPlanRequest -> IO String
