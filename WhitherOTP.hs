@@ -71,6 +71,9 @@ parseResponse text =
     Left msg -> error ("Decoding failed because " ++ msg ++ " when trying to decode " ++ text)
     Right obj -> obj
 
+parseFromURL :: String -> IO OTPResponse
+parseFromURL url = liftM parseResponse $ simpleHTTP (getRequest url) >>= getResponseBody
+
 data OTPError = OTPError String deriving Show
 
 instance FromJSON OTPError where
@@ -195,6 +198,7 @@ showDeparture leg =
   in case (lMode leg) of
     "WALK" -> timestamp ++ commonText ++ walkText
     "RAIL" -> timestamp ++ commonText ++ railText
+    "TRAM" -> timestamp ++ commonText ++ railText
     _      -> ("What the shit is " ++ lMode leg)
 
 showArrival :: OTPLeg -> String
@@ -208,7 +212,7 @@ timeHeading :: OTPLeg -> String
 timeHeading leg = (displayTime $ lStartTime leg) ++ ": "
 
 routeDesc :: OTPLeg -> String
-routeDesc leg = "the " ++ lRoute leg ++ " bound for " ++ (fromMaybe "no head sign WTF" $ lHeadSign leg)
+routeDesc leg = "the " ++ lRoute leg ++ " with head sign " ++ (fromMaybe "[no head sign]" $ lHeadSign leg)
 
 showLegs :: [OTPLeg] -> [String]
 showLegs [] = []
@@ -219,13 +223,14 @@ showLegs (l1:(l2:xs))
   | sameTrain l1 l2 = [showDeparture l1, timeHeading l2 ++ "Stay on the train as it becomes the " ++ routeDesc l2, showArrival l2] ++ showLegs xs
 -- if l1 is rail and l2 is rail and they are different trains, let's show
 -- l1, the arrival+killing, and recurse l2:xs
-  | (lMode l1 == "RAIL") && (lMode l2 == "RAIL") = [showDeparture l1, showArrival l1 ++ showLayover l1 l2] ++ showLegs (l2:xs)
+  | isRail l1 && isRail l2 = [showDeparture l1, showArrival l1 ++ showLayover l1 l2] ++ showLegs (l2:xs)
 -- if l1 leg is rail and l2 is walking, let's give the l1 departure and arrival
-  | (lMode l1) == "RAIL" && (lMode l2) == "WALK" = [showDeparture l1, showArrival l1] ++ showLegs (l2:xs)
+  | isRail l1 && (lMode l2) == "WALK" = [showDeparture l1, showArrival l1] ++ showLegs (l2:xs)
 -- if l1 is walking, let's give the walking then the arrival+killing
 -- then recurse on l2:xs
   | (lMode l1 == "WALK") = [showDeparture l1, showArrival l1 ++ showLayover l1 l2] ++ showLegs (l2:xs)
-  | otherwise = error "I have no idea what I am doing."
+  | otherwise = (show l1 ++ " AND THIS IS THE ERROR CASE"):(showLegs (l2:xs))
+  where isRail leg = (lMode leg == "RAIL") || (lMode leg == "TRAM")
 
 data OTPPlace = OTPPlace { pName :: String } deriving Show
 
