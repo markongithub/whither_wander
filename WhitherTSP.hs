@@ -60,7 +60,7 @@ module WhitherTSP where
                              finalState = nextState}
         else followDestinations0 otp planFlags remaining deadline nextState
 
-  data Station = Station { name :: String, code :: String, passThrough :: Bool}
+  data Station = Station { name :: String, code :: String}
 
   instance Ord Station where
     compare s1 s2 = compare (name s1) (name s2)
@@ -77,7 +77,7 @@ module WhitherTSP where
       outcome <- followDestinations otp planFlags stops startTime deadline iCache
       return (index, outcome)
     PermutationFailure msg x -> return
-      (index, Outcome{verdict=Failure, nodesLeft=x, message=msg, finalState=TSPState{currentLocation=(Station "this code" "is still terrible" False), currentTime=startTime, legsSoFar=[], cache=iCache}})
+      (index, Outcome{verdict=Failure, nodesLeft=x, message=msg, finalState=TSPState{currentLocation=(Station "this code" "is terrible"), currentTime=startTime, legsSoFar=[], cache=iCache}})
 
   judgePermutations :: OTPImpl a => a -> PermutationTest b Station -> PlanFlagMaker -> UTCTime -> UTCTime -> Set.Set Station -> Int -> Int -> IO ()
   judgePermutations otp test planFlags startTime deadline set startIndex numToTry = let
