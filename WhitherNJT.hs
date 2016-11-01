@@ -67,9 +67,9 @@ module Main where
 
   myFaves = tryPermutations allNJTests  requiredDestinations (3 * factorial 10 + 4 * factorial 9 + 6 * factorial 8 + 6 * factorial 7 + 2 * factorial 5 + 1 * factorial 4) (factorial 4)
 
-  myStartTime = UTCTime (fromGregorian 2016 9 27) (8*60*60) -- 8 AM UTC = 4 AM EDT
+  myStartTime = UTCTime (fromGregorian 2016 10 27) (8*60*60) -- 8 AM UTC = 4 AM EDT
   myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 
   -- mainTSP otp test startTime deadline set startIndex numToTry
   main :: IO()
-  main = mainTSP defaultOTP allNJTests myStartTime myDeadline requiredDestinations
+  main = mainTSP defaultOTP allNJTests defaultPlanFlags myStartTime myDeadline requiredDestinations

@@ -2,6 +2,7 @@ module WhitherTSP where
   import qualified Data.Set as Set
   import Control.Monad (liftM)
   import Data.List (intercalate)
+  import Data.Maybe (fromJust, isJust, isNothing)
   import Data.Time.Clock (addUTCTime, UTCTime(..))
   import System.Environment (getArgs)
   import WhitherOTP
@@ -33,7 +34,7 @@ module WhitherTSP where
 
   followItinerary :: TSPState -> Station -> OTPItinerary -> TSPState
   followItinerary curState nextDestination itin =
-    curState { currentTime = (addUTCTime (fromIntegral minTransferTime) (iEndTime itin))
+    curState { currentTime = iEndTime itin
              , currentLocation = nextDestination 
              , legsSoFar = (legsSoFar curState) ++ (legs itin)}
 
@@ -47,7 +48,7 @@ module WhitherTSP where
   followDestinations0 _ _ [] _ state =
     return Outcome {verdict = Success, nodesLeft=0, message=show state, finalState=state}
   followDestinations0 otp planFlags (nextDest:remaining) deadline state = do
-    (response, newCache) <- getFastestItineraryCaching otp (OTPPlanRequest (code $ currentLocation state) (code nextDest) (currentTime state) (planFlags state)) (cache state) 
+    (response, newCache) <- getItineraryAlightingOrNot otp planFlags nextDest state
     case response of
       Left (OTPError msg) -> return Outcome{
         verdict=Failure, nodesLeft=(1 + length remaining),
@@ -59,6 +60,26 @@ module WhitherTSP where
                              message="Ran out of time. " ++ show nextState,
                              finalState = nextState}
         else followDestinations0 otp planFlags remaining deadline nextState
+
+  getItineraryAlightingOrNot :: OTPImpl a => a -> PlanFlagMaker -> Station -> TSPState -> IO (OTPItineraryOrNot, ItineraryCache)
+  -- this sucks
+  getItineraryAlightingOrNot otp planFlags nextDest state
+    | null (legsSoFar state) = runRequest firstRequest
+    | lMode (last (legsSoFar state)) == "WALK" = runRequest firstRequest
+    | isNothing (lTripBlockID lastLeg) = runRequest secondRequest
+    | otherwise = chainedRequests
+    where lastLeg = last (legsSoFar state)
+          lastBlockID = fromJust (lTripBlockID lastLeg)
+          firstLeg itin = head (legs itin)
+          stayingOnTrain itin = lMode (firstLeg itin) /= "WALK" && isJust (lTripBlockID $ firstLeg itin) && lastBlockID == fromJust (lTripBlockID $ firstLeg itin)
+          firstRequest = OTPPlanRequest (code $ currentLocation state) (code nextDest) (currentTime state) (planFlags state)
+          runRequest r = getFastestItineraryCaching otp r (cache state)
+          secondRequest = firstRequest {departureTime = addUTCTime (fromIntegral minTransferTime) (currentTime state)}
+          chainedRequests = do
+            (response, newCache) <- runRequest firstRequest
+            case response of
+              Left (OTPError msg) -> return (response, newCache)
+              Right itinerary -> if stayingOnTrain itinerary then return (response, newCache) else getFastestItineraryCaching otp secondRequest newCache
 
   data Station = Station { name :: String, code :: String}
 

@@ -144,6 +144,7 @@ getFastestItineraryCaching otp request iCache =
       response <- getFastestItinerary otp request
       return (response, Map.insert request response iCache :: ItineraryCache)
 
+
 data OTPLeg = OTPLeg { lStartTime :: UTCTime,
                        lEndTime :: UTCTime,
                        lFrom :: OTPPlace,
