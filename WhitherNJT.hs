@@ -72,4 +72,4 @@ module Main where
 
   -- mainTSP otp test startTime deadline set startIndex numToTry
   main :: IO()
-  main = mainTSP defaultOTP allNJTests defaultPlanFlags myStartTime myDeadline requiredDestinations
+  main = mainTSP defaultOTP allNJTests defaultPlanFlags myStartTime myDeadline requiredDestinations "/usr/share/zoneinfo/US/Eastern"

@@ -11,22 +11,20 @@ import Data.Text (pack)
 import Data.Time.Clock (diffUTCTime, UTCTime(..))
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
-import Data.Time.LocalTime (TimeZone(..), utcToZonedTime)
+import Data.Time.LocalTime (TimeZone(..))
+import Data.Time.LocalTime.TimeZone.Series (TimeZoneSeries(..), utcToLocalTime')
 import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
-
-failEDT = TimeZone (-4 * 60) True "failEDT"
-failEST = TimeZone (-5 * 60) True "failEST"
 
 minTransferTime = 180
 
 convertMillis :: Int -> UTCTime
 convertMillis ms = posixSecondsToUTCTime (fromIntegral $ quot ms 1000)
 
-queryTime :: UTCTime -> String
-queryTime utc = formatTime defaultTimeLocale "&date=%Y%m%d&time=%H:%M" (utcToZonedTime failEDT utc)
+queryTime :: TimeZoneSeries -> UTCTime -> String
+queryTime tz utc = formatTime defaultTimeLocale "&date=%Y%m%d&time=%H:%M" (utcToLocalTime' tz utc)
 
-displayTime :: UTCTime -> String
-displayTime utc = formatTime defaultTimeLocale "%Y%m%d-%H%M %Z" (utcToZonedTime failEDT utc)
+displayTime :: TimeZoneSeries -> UTCTime -> String
+displayTime tz utc = formatTime defaultTimeLocale "%Y%m%d-%H%M %Z" (utcToLocalTime' tz utc)
 
 data OTPHTTPServer = OTPHTTPServer String
 routerAddress = "http://localhost:8080/otp/routers/default/"
@@ -37,12 +35,13 @@ data OTPPlanRequest = OTPPlanRequest {
   fromStationCode :: String,
   toStationCode :: String,
   departureTime :: UTCTime,
+  tz :: TimeZoneSeries,
   additionalFlags :: [String] } deriving (Eq, Ord, Show)
 
 queryURL :: String -> OTPPlanRequest -> String
-queryURL routerAddress (OTPPlanRequest fromCode toCode travelTime planFlags)
+queryURL routerAddress (OTPPlanRequest fromCode toCode travelTime tz planFlags)
   | otherwise = url
-  where url = routerAddress ++ "plan?minTransferTime=" ++ show minTransferTime ++ "&fromPlace=" ++ fromCode ++ "&toPlace=" ++ toCode ++ queryTime travelTime ++ extraParams
+  where url = routerAddress ++ "plan?minTransferTime=" ++ show minTransferTime ++ "&fromPlace=" ++ fromCode ++ "&toPlace=" ++ toCode ++ queryTime tz travelTime ++ extraParams
         extraParams = "&" ++ intercalate "&" planFlags
 
 getRouteHTTP :: OTPHTTPServer -> OTPPlanRequest -> IO String
@@ -167,16 +166,22 @@ instance FromJSON OTPLeg where
   parseJSON _ = mzero
 
 instance Show OTPLeg where
-  show leg =
-    let commonText = " from " ++ (pName $ lFrom leg) ++ "\n" ++ arrivalText
-        railText = "Take " ++ lRoute leg ++ " train " ++ (fromMaybe "[numberless]" (lTripBlockID leg))
-        walkText = "Start walking toward " ++ (pName $ lTo leg)
-        timestamp = (displayTime $ lStartTime leg) ++ ": "
-        arrivalText = (displayTime $ lEndTime leg) ++ ": Arrive at " ++ (pName $ lTo leg)
-    in case (lMode leg) of
-      "WALK" -> timestamp ++ walkText ++ commonText
-      "RAIL" -> timestamp ++ railText ++ commonText
-      _      -> ("What the hell is " ++ lMode leg)
+  show leg = showLeg cheapUTC leg
+
+cheapUTC :: TimeZoneSeries
+cheapUTC = TimeZoneSeries (TimeZone 0 False "UTC") []
+
+showLeg :: TimeZoneSeries -> OTPLeg -> String
+showLeg tz leg =
+  let commonText = " from " ++ (pName $ lFrom leg) ++ "\n" ++ arrivalText
+      railText = "Take " ++ lRoute leg ++ " train " ++ (fromMaybe "[numberless]" (lTripBlockID leg))
+      walkText = "Start walking toward " ++ (pName $ lTo leg)
+      timestamp = (displayTime tz $ lStartTime leg) ++ ": "
+      arrivalText = (displayTime tz $ lEndTime leg) ++ ": Arrive at " ++ (pName $ lTo leg)
+  in case (lMode leg) of
+    "WALK" -> timestamp ++ walkText ++ commonText
+    "RAIL" -> timestamp ++ railText ++ commonText
+    _      -> ("What the hell is " ++ lMode leg)
 
 trainName :: OTPLeg -> String
 trainName leg = fromMaybe "[numberless]" (lTripBlockID leg)
@@ -190,47 +195,47 @@ sameTrain l1 l2 = case (lTripBlockID l1, lTripBlockID l2) of
   (_, Nothing) -> False
   (Just i1, Just i2) -> i1 == i2
 
-showDeparture :: OTPLeg -> String
-showDeparture leg =
+showDeparture :: TimeZoneSeries -> OTPLeg -> String
+showDeparture tz leg =
   let commonText = "From " ++ (pName $ lFrom leg) ++ ", "
       railText = "take train " ++ trainName leg ++ " on " ++ routeDesc leg
       walkText = "start walking toward " ++ (pName $ lTo leg)
-      timestamp = timeHeading leg
+      timestamp = timeHeading tz leg
   in case (lMode leg) of
     "WALK" -> timestamp ++ commonText ++ walkText
     "RAIL" -> timestamp ++ commonText ++ railText
     "TRAM" -> timestamp ++ commonText ++ railText
     _      -> ("What the shit is " ++ lMode leg)
 
-showArrival :: OTPLeg -> String
-showArrival leg = (displayTime $ lEndTime leg) ++ ": Arrive at " ++ (pName $ lTo leg) ++ "."
+showArrival :: TimeZoneSeries -> OTPLeg -> String
+showArrival tz leg = (displayTime tz $ lEndTime leg) ++ ": Arrive at " ++ (pName $ lTo leg) ++ "."
 
 showLayover :: OTPLeg -> OTPLeg -> String
 showLayover l1 l2 = " Kill " ++ (show minutes) ++ " minutes at " ++ (pName $ lFrom l2) ++ "."
   where minutes = quot (ceiling $ diffUTCTime (lStartTime l2) (lEndTime l1)) 60
 
-timeHeading :: OTPLeg -> String
-timeHeading leg = (displayTime $ lStartTime leg) ++ ": "
+timeHeading :: TimeZoneSeries -> OTPLeg -> String
+timeHeading tz leg = (displayTime tz $ lStartTime leg) ++ ": "
 
 routeDesc :: OTPLeg -> String
 routeDesc leg = "the " ++ lRoute leg ++ " with head sign " ++ (fromMaybe "[no head sign]" $ lHeadSign leg)
 
-showLegs :: [OTPLeg] -> [String]
-showLegs [] = []
-showLegs (l:[]) = [showDeparture l, showArrival l]
-showLegs (l1:(l2:xs))
+showLegs :: TimeZoneSeries -> [OTPLeg] -> [String]
+showLegs _ [] = []
+showLegs tz (l:[]) = [showDeparture tz l, showArrival tz l]
+showLegs tz (l1:(l2:xs))
 -- if l1 is rail and l2 is rail and they are the same train
 -- let's say the departure, no arrival, and "stay on the train" then recurse xs
-  | sameTrain l1 l2 = [showDeparture l1, timeHeading l2 ++ "Stay on the train as it becomes the " ++ routeDesc l2, showArrival l2] ++ showLegs xs
+  | sameTrain l1 l2 = [showDeparture tz l1, timeHeading tz l2 ++ "Stay on the train as it becomes the " ++ routeDesc l2, showArrival tz l2] ++ showLegs tz xs
 -- if l1 is rail and l2 is rail and they are different trains, let's show
 -- l1, the arrival+killing, and recurse l2:xs
-  | isRail l1 && isRail l2 = [showDeparture l1, showArrival l1 ++ showLayover l1 l2] ++ showLegs (l2:xs)
+  | isRail l1 && isRail l2 = [showDeparture tz l1, showArrival tz l1 ++ showLayover l1 l2] ++ showLegs tz (l2:xs)
 -- if l1 leg is rail and l2 is walking, let's give the l1 departure and arrival
-  | isRail l1 && (lMode l2) == "WALK" = [showDeparture l1, showArrival l1] ++ showLegs (l2:xs)
+  | isRail l1 && (lMode l2) == "WALK" = [showDeparture tz l1, showArrival tz l1] ++ showLegs tz (l2:xs)
 -- if l1 is walking, let's give the walking then the arrival+killing
 -- then recurse on l2:xs
-  | (lMode l1 == "WALK") = [showDeparture l1, showArrival l1 ++ showLayover l1 l2] ++ showLegs (l2:xs)
-  | otherwise = (show l1 ++ " AND THIS IS THE ERROR CASE"):(showLegs (l2:xs))
+  | (lMode l1 == "WALK") = [showDeparture tz l1, showArrival tz l1 ++ showLayover l1 l2] ++ showLegs tz (l2:xs)
+  | otherwise = (show l1 ++ " AND THIS IS THE ERROR CASE"):(showLegs tz (l2:xs))
   where isRail leg = (lMode leg == "RAIL") || (lMode leg == "TRAM")
 
 data OTPPlace = OTPPlace { pName :: String } deriving Show
