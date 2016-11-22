@@ -144,8 +144,8 @@ module WhitherTSP where
   defaultPlanFlags :: PlanFlagMaker
   defaultPlanFlags _ = []
 
-  mainTSP :: OTPImpl a => a -> PermutationTest b Station -> PlanFlagMaker -> UTCTime -> UTCTime -> Set.Set Station -> String -> IO()
-  mainTSP otp test planFlags startTime deadline set tzFile = do
+  mainBruteForce :: OTPImpl a => a -> PermutationTest b Station -> PlanFlagMaker -> UTCTime -> UTCTime -> Set.Set Station -> String -> IO()
+  mainBruteForce otp test planFlags startTime deadline set tzFile = do
     args <- getArgs
     tz <- getTimeZoneSeriesFromOlsonFile tzFile
     let [startIndex, numToTry] = take 2 args

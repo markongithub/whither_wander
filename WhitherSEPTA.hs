@@ -52,4 +52,4 @@ module Main where
   myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 
   main :: IO()
-  main = mainTSP defaultOTP allSEPTATests septaFlags myStartTime myDeadline requiredDestinations "/usr/share/zoneinfo/US/Eastern"
+  main = mainBruteForce defaultOTP allSEPTATests septaFlags myStartTime myDeadline requiredDestinations "/usr/share/zoneinfo/US/Eastern"

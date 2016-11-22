@@ -70,6 +70,5 @@ module Main where
   myStartTime = UTCTime (fromGregorian 2016 10 27) (8*60*60) -- 8 AM UTC = 4 AM EDT
   myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 
-  -- mainTSP otp test startTime deadline set startIndex numToTry
   main :: IO()
-  main = mainTSP defaultOTP allNJTests defaultPlanFlags myStartTime myDeadline requiredDestinations "/usr/share/zoneinfo/US/Eastern"
+  main = mainBruteForce defaultOTP allNJTests defaultPlanFlags myStartTime myDeadline requiredDestinations "/usr/share/zoneinfo/US/Eastern"
