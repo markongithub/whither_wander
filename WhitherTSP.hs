@@ -1,11 +1,10 @@
 module WhitherTSP where
   import qualified Data.Set as Set
-  import Control.Monad (liftM)
   import Data.List (intercalate)
   import Data.Maybe (fromJust, isJust, isNothing)
   import Data.Time.Clock (addUTCTime, UTCTime(..))
   import Data.Time.LocalTime.TimeZone.Olson (getTimeZoneSeriesFromOlsonFile)
-  import Data.Time.LocalTime.TimeZone.Series (TimeZoneSeries(..), localTimeToUTC', utcToLocalTime')
+  import Data.Time.LocalTime.TimeZone.Series (TimeZoneSeries(..))
   import System.Environment (getArgs)
   import WhitherOTP
   import WhitherPermutations (alwaysTrue, factorial, nextMultiple, permAtIndex, tryPermutations, PermutationOutcome(..), PermutationTest)
