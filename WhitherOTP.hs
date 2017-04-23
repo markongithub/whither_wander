@@ -73,7 +73,7 @@ parseResponse text =
 parseFromURL :: String -> IO OTPResponse
 parseFromURL url = liftM parseResponse $ simpleHTTP (getRequest url) >>= getResponseBody
 
-data OTPError = OTPError String deriving Show
+data OTPError = OTPError String deriving (Eq, Show)
 
 instance FromJSON OTPError where
   parseJSON (Object v) =
@@ -101,7 +101,7 @@ instance FromJSON OTPTripPlan where
 
 data OTPItinerary = OTPItinerary { iStartTime :: UTCTime,
                                    iEndTime :: UTCTime,
-                                   legs :: [OTPLeg] } deriving Show
+                                   legs :: [OTPLeg] } deriving (Eq, Show)
 
 instance FromJSON OTPItinerary where
   parseJSON (Object v) =
@@ -148,10 +148,11 @@ data OTPLeg = OTPLeg { lStartTime :: UTCTime,
                        lEndTime :: UTCTime,
                        lFrom :: OTPPlace,
                        lTo :: OTPPlace,
+                       lTripID :: Maybe String,
                        lTripBlockID :: Maybe String,
                        lHeadSign :: Maybe String,
                        lRoute :: String,
-                       lMode :: String}
+                       lMode :: String} deriving (Eq)
 
 instance FromJSON OTPLeg where
   parseJSON (Object v) =
@@ -159,6 +160,7 @@ instance FromJSON OTPLeg where
            <*> (convertMillis <$> (v .: pack "endTime"))
            <*> v .: pack "from"
            <*> v .: pack "to"
+           <*> v .:? pack "tripId"
            <*> v .:? pack "tripBlockId"
            <*> v .:? pack "headsign"
            <*> v .: pack "route"
@@ -238,9 +240,84 @@ showLegs tz (l1:(l2:xs))
   | otherwise = (show l1 ++ " AND THIS IS THE ERROR CASE"):(showLegs tz (l2:xs))
   where isRail leg = (lMode leg == "RAIL") || (lMode leg == "TRAM")
 
-data OTPPlace = OTPPlace { pName :: String } deriving Show
+data OTPPlace = OTPPlace { pName :: String } deriving (Eq, Show)
 
 instance FromJSON OTPPlace where
   parseJSON (Object v) =
     OTPPlace <$> v .: pack "name"
   parseJSON _ = mzero
+
+data OTPStopTimesList = OTPStopTimesList {
+  pattern :: Object,
+  times :: [OTPStopTime]
+} deriving (Eq, Show)
+  
+instance FromJSON OTPStopTimesList where
+  parseJSON (Object v) =
+    OTPStopTimesList <$> v .: pack "pattern"
+                     <*> v .: pack "times"
+  parseJSON _ = mzero
+
+data OTPStopTime = OTPStopTime {
+  stopDepartureTime :: UTCTime,
+  stopID :: String,
+  tripID :: String
+} deriving (Eq, Show)
+
+instance FromJSON OTPStopTime where
+  parseJSON (Object v) =
+    OTPStopTime <$> (posixSecondsToUTCTime <$> ((+) <$> (v .: pack "serviceDay") <*> (v .: pack "scheduledDeparture")))
+                <*> v .: pack "stopId"
+                <*> v .: pack "tripId"
+  parseJSON _ = mzero
+
+-- >>> data[0]['times'][0]
+-- {u'scheduledArrival': 27900, u'realtimeArrival': 27900, u'blockId': u'0871', u'tripId': u'1:1768', u'stopIndex': 23, u'departureDelay': 0, u'realtime': False, u'realtimeDeparture': 27900, u'headsign': u'HACKETTSTOWN', u'timepoint': True, u'serviceDay': 1477540800, u'stopId': u'1:54', u'stopCount': 24, u'realtimeState': u'SCHEDULED', u'scheduledDeparture': 27900, u'arrivalDelay': 0}
+
+parseStopTimesResponse :: String -> [OTPStopTimesList]
+parseStopTimesResponse text =
+  let bs = packChars text
+      decoded = eitherDecode bs
+  in case decoded of
+    Left msg -> error ("Decoding failed because " ++ msg ++ " when trying to decode " ++ text)
+    Right obj -> obj
+
+parseStopTimes :: String -> [OTPStopTime]
+parseStopTimes = concat . map times . parseStopTimesResponse
+
+-- We just need a stop ID and a date
+data OTPStopTimesRequest = OTPStopTimesRequest {
+  reqStopCode :: String,
+  reqDate :: String -- YYYYMMDD
+} deriving Show
+
+queryURLStopTimes :: String -> OTPStopTimesRequest -> String
+queryURLStopTimes routerAddress (OTPStopTimesRequest stopCode date) =
+  routerAddress ++ "index/stops/" ++ stopCode ++ "/stoptimes/" ++ date
+
+getStopTimesHTTP :: OTPHTTPServer -> OTPStopTimesRequest -> IO String
+getStopTimesHTTP (OTPHTTPServer routerAddress) request =
+  let url = queryURLStopTimes routerAddress request
+  in simpleHTTP (getRequest url) >>= getResponseBody
+
+data OTPStop = OTPStop { stopCode :: String, stopName :: String } deriving (Eq, Ord, Show)
+instance FromJSON OTPStop where
+  parseJSON (Object v) =
+    OTPStop <$> v .: pack "id"
+            <*> v .: pack "name"
+  parseJSON _ = mzero
+
+parseStopsResponse :: String -> [OTPStop]
+parseStopsResponse text =
+  let bs = packChars text
+      decoded = eitherDecode bs
+  in case decoded of
+    Left msg -> error ("Decoding failed because " ++ msg ++ " when trying to decode " ++ text)
+    Right obj -> obj
+
+getStopsHTTP :: OTPHTTPServer -> IO String
+getStopsHTTP (OTPHTTPServer routerAddress) =
+  let url = routerAddress ++ "index/stops/"
+  in simpleHTTP (getRequest url) >>= getResponseBody
+
+
