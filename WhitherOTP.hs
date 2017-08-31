@@ -183,6 +183,7 @@ showLeg tz leg =
   in case (lMode leg) of
     "WALK" -> timestamp ++ walkText ++ commonText
     "RAIL" -> timestamp ++ railText ++ commonText
+    "SUBWAY" -> timestamp ++ railText ++ commonText
     _      -> ("What the hell is " ++ lMode leg)
 
 trainName :: OTPLeg -> String
@@ -207,6 +208,7 @@ showDeparture tz leg =
     "WALK" -> timestamp ++ commonText ++ walkText
     "RAIL" -> timestamp ++ commonText ++ railText
     "TRAM" -> timestamp ++ commonText ++ railText
+    "SUBWAY" -> timestamp ++ commonText ++ railText
     _      -> ("What the shit is " ++ lMode leg)
 
 showArrival :: TimeZoneSeries -> OTPLeg -> String
@@ -238,7 +240,7 @@ showLegs tz (l1:(l2:xs))
 -- then recurse on l2:xs
   | (lMode l1 == "WALK") = [showDeparture tz l1, showArrival tz l1 ++ showLayover l1 l2] ++ showLegs tz (l2:xs)
   | otherwise = (show l1 ++ " AND THIS IS THE ERROR CASE"):(showLegs tz (l2:xs))
-  where isRail leg = (lMode leg == "RAIL") || (lMode leg == "TRAM")
+  where isRail leg = (lMode leg == "RAIL") || (lMode leg == "SUBWAY") || (lMode leg == "TRAM")
 
 data OTPPlace = OTPPlace { pName :: String } deriving (Eq, Show)
 
