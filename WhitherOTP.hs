@@ -4,6 +4,7 @@ import Control.Monad (liftM, mzero)
 import Data.Aeson ((.:), (.:?), eitherDecode, FromJSON, parseJSON)
 import Data.Aeson.Types (Object, Value(..))
 import Data.ByteString.Lazy.Internal (packChars)
+import Data.Char (toLower)
 import Data.List (intercalate, minimumBy)
 import Data.Map as Map (Map, empty, insert, lookup)
 import Data.Maybe (fromMaybe)
@@ -221,8 +222,16 @@ showLayover l1 l2 = " Kill " ++ (show minutes) ++ " minutes at " ++ (pName $ lFr
 timeHeading :: TimeZoneSeries -> OTPLeg -> String
 timeHeading tz leg = (displayTime tz $ lStartTime leg) ++ ": "
 
+prettyRouteName :: OTPLeg -> String
+prettyRouteName leg = let
+  routeNameFromOTP = lRoute leg
+  lastFive = take 5 $ reverse $ routeNameFromOTP
+  endsInLine = map toLower lastFive == " line"
+  lineSuffix = if endsInLine then "" else " line"
+  in routeNameFromOTP ++ lineSuffix
+
 routeDesc :: OTPLeg -> String
-routeDesc leg = "the " ++ lRoute leg ++ " with head sign " ++ (fromMaybe "[no head sign]" $ lHeadSign leg)
+routeDesc leg = "the " ++ prettyRouteName leg ++ " with head sign " ++ (fromMaybe "[no head sign]" $ lHeadSign leg)
 
 showLegs :: TimeZoneSeries -> [OTPLeg] -> [String]
 showLegs _ [] = []
