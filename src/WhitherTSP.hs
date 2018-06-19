@@ -143,11 +143,25 @@ module WhitherTSP where
   defaultPlanFlags :: PlanFlagMaker
   defaultPlanFlags _ = []
 
-  mainBruteForce :: OTPImpl a => a -> PermutationTest b Station -> PlanFlagMaker -> UTCTime -> UTCTime -> Set.Set Station -> String -> IO()
-  mainBruteForce otp test planFlags startTime deadline set tzFile = do
+  unsafeParseInt :: String -> Int
+  unsafeParseInt s = (read s :: Int)
+
+  readTwoInts :: IO (Int, Int)
+  readTwoInts = do
     args <- getArgs
+    let [startIndex, numToTry] = map unsafeParseInt $ take 2 args
+    return (startIndex, numToTry)
+
+  readFourInts :: IO (Int, Int, Int, Int)
+  readFourInts = do
+    args <- getArgs
+    let fourStrings = take 4 args
+    let [hour, minute, startIndex, numToTry] = map unsafeParseInt $ take 4 args
+    return (hour, minute, startIndex, numToTry)
+
+  mainBruteForce :: OTPImpl a => a -> PermutationTest b Station -> PlanFlagMaker -> UTCTime -> UTCTime -> Set.Set Station -> Int -> Int -> String -> IO()
+  mainBruteForce otp test planFlags startTime deadline set startIndex numToTry tzFile = do
     tz <- getTimeZoneSeriesFromOlsonFile tzFile
-    let [startIndex, numToTry] = take 2 args
-    if (numToTry == "1")
-      then printTSPAtIndex set otp planFlags startTime deadline tz (read startIndex :: Int)
-      else judgePermutations otp test planFlags startTime deadline tz set (read startIndex :: Int) (read numToTry :: Int)
+    if (numToTry == 1)
+      then printTSPAtIndex set otp planFlags startTime deadline tz startIndex
+      else judgePermutations otp test planFlags startTime deadline tz set startIndex numToTry

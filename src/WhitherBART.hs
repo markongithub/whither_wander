@@ -30,4 +30,6 @@ module Main where
   allBARTTests = chainTests millbraeTest fremontTest
 
   main :: IO()
-  main = mainBruteForce defaultOTP allBARTTests defaultPlanFlags myStartTime myDeadline requiredDestinations "/usr/share/zoneinfo/US/Pacific"
+  main = do
+    (startIndex, numToTry) <- readTwoInts
+    mainBruteForce defaultOTP allBARTTests defaultPlanFlags myStartTime myDeadline requiredDestinations startIndex numToTry "/usr/share/zoneinfo/US/Pacific"
