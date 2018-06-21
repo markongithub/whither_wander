@@ -25,18 +25,20 @@ module Main where
   getStation stationName = let
     matches = filter (\s -> name s == stationName) allStations
     in if (null matches) then (error ("the fuck is " ++ stationName)) else (head matches)
-  -- 2350 UTC = 0450 EST -- this is so wrong how did that ever make sense
-  myStartTime = UTCTime (fromGregorian 2018 01 03) (15*60*60 + 35*60)
-  myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 
   stadiumTest = twoAdjacent (getStation "New Carrollton") (getStation "Largo Town Center")
   alexandriaTest = twoAdjacent (getStation "Huntington") (getStation "Franconia-Springfield")
   fallsChurchTest = twoAdjacent (getStation "Vienna") (getStation "Wiehle")
-  allWMATATests = chainTests stadiumTest $ chainTests alexandriaTest fallsChurchTest
+  redLineTest = twoAdjacent (getStation "Shady Grove") (getStation "Glenmont")
+  greenLineTest = twoAdjacent (getStation "Branch Ave") (getStation "Greenbelt")
+  southeastTest = twoAdjacent (getStation "Branch Ave") (getStation "Huntington")
+  silverOrangeTest = setAdjacent $ Set.fromList (map getStation ["Vienna", "New Carrollton", "Wiehle", "Largo Town Center"])
+  rosslynTest = setAdjacent $ Set.fromList (map getStation ["Vienna", "Wiehle", "Franconia-Springfield"])
+  allWMATATests = chainTests stadiumTest $ chainTests alexandriaTest $ chainTests fallsChurchTest $ chainTests redLineTest $ chainTests greenLineTest $ chainTests silverOrangeTest $ chainTests rosslynTest southeastTest
 
   main :: IO()
   main = do
     (hour, minute, startIndex, numToTry) <- readFourInts
-    let startTime = UTCTime (fromGregorian 2018 01 03) (60*60*(fromIntegral hour) + 60*(fromIntegral minute))
-    let deadline = addUTCTime (60 * 60 * 25) startTime
+    let startTime = UTCTime (fromGregorian 2018 06 28) (60*60*(fromIntegral hour) + 60*(fromIntegral minute))
+    let deadline = addUTCTime (60 * 60 * 7 + 60 * 30) startTime
     mainBruteForce defaultOTP allWMATATests defaultPlanFlags startTime deadline requiredDestinations startIndex numToTry "/usr/share/zoneinfo/US/Eastern"
