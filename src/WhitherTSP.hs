@@ -2,7 +2,7 @@ module WhitherTSP where
   import qualified Data.Set as Set
   import Data.List (intercalate)
   import Data.Maybe (fromJust, isJust, isNothing)
-  import Data.Time.Clock (addUTCTime, UTCTime(..))
+  import Data.Time.Clock (addUTCTime, diffUTCTime, UTCTime(..))
   import Data.Time.LocalTime.TimeZone.Olson (getTimeZoneSeriesFromOlsonFile)
   import Data.Time.LocalTime.TimeZone.Series (TimeZoneSeries(..))
   import System.Environment (getArgs)
@@ -19,6 +19,15 @@ module WhitherTSP where
         Success -> "Success: "
         Failure -> "Failed with " ++ (show $ nodesLeft outcome) ++ " stops left: "
       in intro ++ message outcome
+
+  showOutcomeWithDuration :: Outcome -> UTCTime -> String
+  showOutcomeWithDuration outcome startTime = case verdict outcome of
+        Success -> showSuccess
+        Failure -> show outcome
+      where durationSeconds = diffUTCTime (currentTime $ finalState outcome) startTime
+            durationMinutes = quot (ceiling durationSeconds) 60
+            showSuccess = (show outcome) ++ " (" ++ show durationMinutes ++ " minutes)"
+
 
   data Verdict = Success | Failure deriving (Eq, Show)
 
@@ -116,7 +125,7 @@ module WhitherTSP where
   judgeEach otp planFlags startTime deadline _ [] _ = return ()
   judgeEach otp planFlags startTime deadline tz (x:xs) iCache = do
     (index, outcome) <- judgePermutation otp planFlags startTime deadline tz x iCache
-    putStrLn (show (index, outcome))
+    putStrLn (show (index, showOutcomeWithDuration outcome startTime))
     let newCache = cache $ finalState outcome
     let nextIndex = case (verdict outcome) of Failure -> nextMultiple index (factorial $ nodesLeft outcome)
                                               _ -> index + 1
