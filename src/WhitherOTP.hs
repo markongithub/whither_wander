@@ -16,7 +16,7 @@ import Data.Time.LocalTime (TimeZone(..))
 import Data.Time.LocalTime.TimeZone.Series (TimeZoneSeries(..), utcToLocalTime')
 import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
 
-minTransferTime = 180
+minTransferTime = 60
 
 convertMillis :: Int -> UTCTime
 convertMillis ms = posixSecondsToUTCTime (fromIntegral $ quot ms 1000)
