@@ -12,7 +12,7 @@ module WhitherPermutations where
   factorial0 1 accu = accu
   factorial0 n accu = factorial0 (n - 1) (n * accu)
 
-  data PermutationOutcome a = Permutation [a] | PermutationFailure String Int deriving Show
+  data PermutationOutcome a = Permutation [a] | PermutationFailure String Int deriving (Eq, Show)
 
   tryPermutations :: (Eq a, Show a) => PermutationTest b a -> Set.Set a -> Int -> Int -> [(Int, PermutationOutcome a)]
 --  tryPermutations test s startIndex numToTry = tryPermutations0 test s startIndex (startIndex + numToTry - 1) []
@@ -107,6 +107,30 @@ module WhitherPermutations where
   mergeStates (OKSoFar x) Finished = OKSoFar (OKSoFar x, Finished)
   mergeStates Finished (OKSoFar y) = OKSoFar (Finished, OKSoFar y)
   mergeStates Finished Finished = Finished
+
+  mergeStateList :: [TestState a] -> TestState [TestState a]
+  mergeStateList [] = Finished
+  mergeStateList (x:xs) = let
+    remainder = mergeStateList xs
+    in case (x, remainder) of
+         (EarlyExit msg, _)         -> EarlyExit msg
+         (_,         EarlyExit msg) -> EarlyExit msg
+         (OKSoFar q, OKSoFar ys)    -> OKSoFar ((OKSoFar q):ys)
+         (OKSoFar q, Finished)      -> OKSoFar [OKSoFar q]
+         (Finished,  OKSoFar ys)    -> OKSoFar ys
+         (Finished,  Finished)      -> Finished
+
+  makeListFunc :: [TestFunc a i] -> TestFunc [TestState a] i
+  makeListFunc funcs = \states input ->
+    let zipFunc f s = applyToState f s input
+        newStates = zipWith zipFunc funcs states
+    in mergeStateList newStates
+
+  chainTestList :: [PermutationTest b i] -> PermutationTest [TestState b] i
+  chainTestList tests = PermutationTest {
+      state = mergeStateList (map state tests)
+    , func = makeListFunc (map func tests)
+    }
 
   alwaysTrue :: PermutationTest () a
   alwaysTrue = PermutationTest { state = Finished, func = error "why was the alwaysTrue func called" }

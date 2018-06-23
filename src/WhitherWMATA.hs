@@ -32,9 +32,13 @@ module Main where
   redLineTest = twoAdjacent (getStation "Shady Grove") (getStation "Glenmont")
   greenLineTest = twoAdjacent (getStation "Branch Ave") (getStation "Greenbelt")
   southeastTest = twoAdjacent (getStation "Branch Ave") (getStation "Huntington")
+  allPairTests = chainTestList [stadiumTest, alexandriaTest, fallsChurchTest, redLineTest, greenLineTest, southeastTest]
+
   silverOrangeTest = setAdjacent $ Set.fromList (map getStation ["Vienna", "New Carrollton", "Wiehle", "Largo Town Center"])
   rosslynTest = setAdjacent $ Set.fromList (map getStation ["Vienna", "Wiehle", "Franconia-Springfield"])
-  allWMATATests = chainTests stadiumTest $ chainTests alexandriaTest $ chainTests fallsChurchTest $ chainTests redLineTest $ chainTests greenLineTest $ chainTests silverOrangeTest $ chainTests rosslynTest southeastTest
+  allSetTests = chainTestList [silverOrangeTest, rosslynTest]
+
+  allWMATATests = chainTests allPairTests allSetTests
 
   main :: IO()
   main = do
