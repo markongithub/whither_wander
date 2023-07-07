@@ -2,6 +2,8 @@ module WhitherOTP where
 
 import Control.Monad (liftM, mzero)
 import Data.Aeson ((.:), (.:?), eitherDecode, FromJSON, parseJSON)
+import Data.Aeson.Key (Key, fromText)
+import Data.Aeson ((.:), (.:?), eitherDecode, FromJSON, parseJSON)
 import Data.Aeson.Types (Object, Value(..))
 import Data.ByteString.Lazy.Internal (packChars)
 import Data.Char (toLower)
@@ -78,8 +80,11 @@ data OTPError = OTPError String deriving (Eq, Show)
 
 instance FromJSON OTPError where
   parseJSON (Object v) =
-    OTPError <$> v .: pack "msg"
+    OTPError <$> v .: stringToKey "msg"
   parseJSON _ = mzero
+
+stringToKey :: String -> Key
+stringToKey = fromText . pack
 
 data OTPResponse =
   OTPResponse { plan :: Maybe OTPTripPlan,
@@ -88,16 +93,16 @@ data OTPResponse =
 
 instance FromJSON OTPResponse where
   parseJSON (Object v) =
-    OTPResponse <$> v .:? pack "plan"
-                <*> v .:? pack "error"
-                <*> v .: pack "requestParameters"
+    OTPResponse <$> v .:? stringToKey "plan"
+                <*> v .:? stringToKey "error"
+                <*> v .: stringToKey "requestParameters"
   parseJSON _ = mzero
 
 data OTPTripPlan = OTPTripPlan { itineraries :: [OTPItinerary] } deriving Show
 
 instance FromJSON OTPTripPlan where
  parseJSON (Object v) =
-    OTPTripPlan <$> v .: pack "itineraries"
+    OTPTripPlan <$> v .: stringToKey "itineraries"
  parseJSON _ = mzero
 
 data OTPItinerary = OTPItinerary { iStartTime :: UTCTime,
@@ -106,9 +111,9 @@ data OTPItinerary = OTPItinerary { iStartTime :: UTCTime,
 
 instance FromJSON OTPItinerary where
   parseJSON (Object v) =
-    OTPItinerary <$> (convertMillis <$> (v .: pack "startTime"))
-                 <*> (convertMillis <$> (v .: pack "endTime"))
-                 <*> v .: pack "legs"
+    OTPItinerary <$> (convertMillis <$> (v .: stringToKey "startTime"))
+                 <*> (convertMillis <$> (v .: stringToKey "endTime"))
+                 <*> v .: stringToKey "legs"
   parseJSON _ = mzero
 
 fastestItinerary :: OTPTripPlan -> OTPItinerary
@@ -157,15 +162,15 @@ data OTPLeg = OTPLeg { lStartTime :: UTCTime,
 
 instance FromJSON OTPLeg where
   parseJSON (Object v) =
-    OTPLeg <$> (convertMillis <$> (v .: pack "startTime"))
-           <*> (convertMillis <$> (v .: pack "endTime"))
-           <*> v .: pack "from"
-           <*> v .: pack "to"
-           <*> v .:? pack "tripId"
-           <*> v .:? pack "tripBlockId"
-           <*> v .:? pack "headsign"
-           <*> v .: pack "route"
-           <*> v .: pack "mode"
+    OTPLeg <$> (convertMillis <$> (v .: stringToKey "startTime"))
+           <*> (convertMillis <$> (v .: stringToKey "endTime"))
+           <*> v .: stringToKey "from"
+           <*> v .: stringToKey "to"
+           <*> v .:? stringToKey "tripId"
+           <*> v .:? stringToKey "tripBlockId"
+           <*> v .:? stringToKey "headsign"
+           <*> v .: stringToKey "route"
+           <*> v .: stringToKey "mode"
   parseJSON _ = mzero
 
 instance Show OTPLeg where
@@ -255,7 +260,7 @@ data OTPPlace = OTPPlace { pName :: String } deriving (Eq, Show)
 
 instance FromJSON OTPPlace where
   parseJSON (Object v) =
-    OTPPlace <$> v .: pack "name"
+    OTPPlace <$> v .: stringToKey "name"
   parseJSON _ = mzero
 
 data OTPStopTimesList = OTPStopTimesList {
@@ -265,8 +270,8 @@ data OTPStopTimesList = OTPStopTimesList {
   
 instance FromJSON OTPStopTimesList where
   parseJSON (Object v) =
-    OTPStopTimesList <$> v .: pack "pattern"
-                     <*> v .: pack "times"
+    OTPStopTimesList <$> v .: stringToKey "pattern"
+                     <*> v .: stringToKey "times"
   parseJSON _ = mzero
 
 data OTPStopTime = OTPStopTime {
@@ -277,9 +282,9 @@ data OTPStopTime = OTPStopTime {
 
 instance FromJSON OTPStopTime where
   parseJSON (Object v) =
-    OTPStopTime <$> (posixSecondsToUTCTime <$> ((+) <$> (v .: pack "serviceDay") <*> (v .: pack "scheduledDeparture")))
-                <*> v .: pack "stopId"
-                <*> v .: pack "tripId"
+    OTPStopTime <$> (posixSecondsToUTCTime <$> ((+) <$> (v .: stringToKey "serviceDay") <*> (v .: stringToKey "scheduledDeparture")))
+                <*> v .: stringToKey "stopId"
+                <*> v .: stringToKey "tripId"
   parseJSON _ = mzero
 
 -- >>> data[0]['times'][0]
@@ -314,8 +319,8 @@ getStopTimesHTTP (OTPHTTPServer routerAddress) request =
 data OTPStop = OTPStop { stopCode :: String, stopName :: String } deriving (Eq, Ord, Show)
 instance FromJSON OTPStop where
   parseJSON (Object v) =
-    OTPStop <$> v .: pack "id"
-            <*> v .: pack "name"
+    OTPStop <$> v .: stringToKey "id"
+            <*> v .: stringToKey "name"
   parseJSON _ = mzero
 
 parseStopsResponse :: String -> [OTPStop]
