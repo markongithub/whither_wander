@@ -14,8 +14,8 @@ import Data.Text (pack)
 import Data.Time.Clock (diffUTCTime, UTCTime(..))
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
-import Data.Time.LocalTime (TimeZone(..))
-import Data.Time.LocalTime.TimeZone.Series (TimeZoneSeries(..), utcToLocalTime')
+import Data.Time.LocalTime (TimeZone(..), utcToZonedTime)
+import Data.Time.LocalTime.TimeZone.Series (TimeZoneSeries(..), timeZoneFromSeries, utcToLocalTime')
 import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
 
 minTransferTime = 60
@@ -27,7 +27,10 @@ queryTime :: TimeZoneSeries -> UTCTime -> String
 queryTime tz utc = formatTime defaultTimeLocale "&date=%Y%m%d&time=%H:%M" (utcToLocalTime' tz utc)
 
 displayTime :: TimeZoneSeries -> UTCTime -> String
-displayTime tz utc = formatTime defaultTimeLocale "%Y%m%d-%H%M %Z" (utcToLocalTime' tz utc)
+displayTime tzs utc = let
+  tz = timeZoneFromSeries tzs utc
+  zoned = utcToZonedTime tz utc
+  in formatTime defaultTimeLocale "%Y%m%d-%H%M %Z" zoned
 
 data OTPHTTPServer = OTPHTTPServer String
 routerAddress = "http://localhost:8080/otp/routers/default/"
