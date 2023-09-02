@@ -20,8 +20,8 @@ module Main where
   sfoFlags state
     | not atSFO = []
     | otherwise = case lastRoute of
-      "Richmond to Daly City/Millbrae" -> ["bannedRoutes=1:Millbrae/Daly City to Richmond"]
-      "Antioch to SFIA/Millbrae" -> ["bannedRoutes=1:Millbrae/SFIA to Antioch"]
+      "Richmond to Daly City/Millbrae" -> [("bannedRoutes", "1:8")]
+      "Antioch to SFIA/Millbrae" -> [("bannedRoutes", "1:2")]
       _ -> error ("Unexpected route: " ++ lastRoute)
     where atSFO = (take (length "San Francisco International") $ name $ currentLocation state) == "San Francisco International"
           lastRoute = lRoute (last $ legsSoFar state)
@@ -48,9 +48,3 @@ module Main where
     let startTime = UTCTime (fromGregorian 2023 09 05) (60*60*(fromIntegral hour) + 60*(fromIntegral minute))
     let deadline = addUTCTime (60 * 60 * 6 + 60 * 15) startTime
     mainBruteForce defaultOTP allBARTTests sfoFlags startTime deadline requiredDestinations startIndex numToTry "/usr/share/zoneinfo/US/Pacific"
-
-
-
-
-
-

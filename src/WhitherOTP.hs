@@ -46,7 +46,7 @@ data OTPPlanRequest = OTPPlanRequest {
   toStationCode :: String,
   departureTime :: UTCTime,
   tz :: TimeZoneSeries,
-  additionalFlags :: [String] } deriving (Eq, Ord, Show)
+  additionalFlags :: [(String, String)] } deriving (Eq, Ord, Show)
 
 queryURL :: String -> OTPPlanRequest -> String
 queryURL routerAddress (OTPPlanRequest fromCode toCode travelTime tz planFlags)
@@ -56,7 +56,7 @@ queryURL routerAddress (OTPPlanRequest fromCode toCode travelTime tz planFlags)
             makeQueryParam ("minTransferTime", show minTransferTime)
           , makeQueryParam ("fromPlace", fromCode)
           , makeQueryParam ("toPlace", toCode)
-          ] ++ map makeQueryParam (queryTime tz travelTime)
+          ] ++ map makeQueryParam ((queryTime tz travelTime) ++ planFlags)
         query = DBI.unpackChars $ renderQuery False allParams
 
 
@@ -65,9 +65,9 @@ makeQueryParam (a, b) = (DBI.packChars a, Just $ DBI.packChars b)
 
 getRouteHTTP :: OTPHTTPServer -> OTPPlanRequest -> IO String
 getRouteHTTP (OTPHTTPServer routerAddress) request =
-  let url2 = queryURL routerAddress request
-      url = traceShow url2 url2
-  in simpleHTTP (getRequest url) >>= getResponseBody
+  let urlQuiet = queryURL routerAddress request
+      urlDebug = traceShow urlQuiet urlQuiet
+  in simpleHTTP (getRequest urlQuiet) >>= getResponseBody
 
 class OTPImpl a where
   getRouteJSON :: a -> OTPPlanRequest -> IO String

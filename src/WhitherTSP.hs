@@ -38,7 +38,7 @@ module WhitherTSP where
   instance Show TSPState where
     show state = ("After " ++ (show $ durationMinutes state) ++ " minutes it is " ++ displayTime cheapUTC (currentTime state) ++ " and we are at " ++ (show $ currentLocation state))
 
-  type PlanFlagMaker = TSPState -> [String]
+  type PlanFlagMaker = TSPState -> [(String, String)]
 
   followItinerary :: TSPState -> Station -> OTPItinerary -> TSPState
   followItinerary curState nextDestination itin = let
