@@ -21,7 +21,7 @@ module Main where
   getStation stationName = head $ filter (\s -> name s == stationName) allStations
 
   -- 2300 UTC = 1600 PDT
-  myStartTime = UTCTime (fromGregorian 2017 08 31) (23*60*60)
+  myStartTime = UTCTime (fromGregorian 2023 09 01) (23*60*60)
   -- BART is small so this does not matter.
   myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 

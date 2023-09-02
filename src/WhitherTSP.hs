@@ -20,11 +20,11 @@ module WhitherTSP where
         Failure -> "Failed with " ++ (show $ nodesLeft outcome) ++ " stops left: "
       in intro ++ message outcome
 
-  showOutcomeWithDuration :: Outcome -> UTCTime -> String
-  showOutcomeWithDuration outcome startTime = case verdict outcome of
+  showOutcomeWithDuration :: Outcome -> String
+  showOutcomeWithDuration outcome = case verdict outcome of
         Success -> showSuccess
         Failure -> show outcome
-      where durationSeconds = diffUTCTime (currentTime $ finalState outcome) startTime
+      where durationSeconds = diffUTCTime (currentTime $ finalState outcome) (startTime $ finalState outcome)
             durationMinutes = quot (ceiling durationSeconds) 60
             showSuccess = (show outcome) ++ " (" ++ show durationMinutes ++ " minutes)"
 
@@ -35,6 +35,7 @@ module WhitherTSP where
                            , currentLocation :: Station
                            , legsSoFar :: [OTPLeg]
                            , cache :: ItineraryCache
+                           , startTime :: UTCTime
                            }
 
   instance Show TSPState where
@@ -43,15 +44,19 @@ module WhitherTSP where
   type PlanFlagMaker = TSPState -> [String]
 
   followItinerary :: TSPState -> Station -> OTPItinerary -> TSPState
-  followItinerary curState nextDestination itin =
-    curState { currentTime = iEndTime itin
-             , currentLocation = nextDestination 
-             , legsSoFar = (legsSoFar curState) ++ (legs itin)}
+  followItinerary curState nextDestination itin = let
+    firstLegStartTime = lStartTime $ head $ legs itin
+    newStartTime = if (null $ legsSoFar curState) then firstLegStartTime else startTime curState
+    in curState { currentTime = iEndTime itin
+                , currentLocation = nextDestination
+                , legsSoFar = (legsSoFar curState) ++ (legs itin)
+                , startTime = newStartTime
+                }
 
   followDestinations :: OTPImpl a => a -> PlanFlagMaker -> [Station] -> UTCTime -> UTCTime -> TimeZoneSeries -> ItineraryCache -> IO Outcome
   followDestinations otp planFlags [] utc deadline tz iCache = error "why would you have no destinations?"
   followDestinations otp planFlags (startPlace:remaining) utc deadline tz iCache =
-    let firstState = TSPState{currentLocation=startPlace, currentTime=utc, legsSoFar=[], cache=iCache}
+    let firstState = TSPState{currentLocation=startPlace, currentTime=utc, legsSoFar=[], cache=iCache, startTime=utc}
     in followDestinations0 otp planFlags remaining deadline tz firstState
 
   followDestinations0 :: OTPImpl a => a -> PlanFlagMaker -> [Station] -> UTCTime -> TimeZoneSeries -> TSPState -> IO Outcome
@@ -108,7 +113,7 @@ module WhitherTSP where
       outcome <- followDestinations otp planFlags stops startTime deadline tz iCache
       return (index, outcome)
     PermutationFailure msg x -> return
-      (index, Outcome{verdict=Failure, nodesLeft=x, message=msg, finalState=TSPState{currentLocation=(Station "this code" "is terrible"), currentTime=startTime, legsSoFar=[], cache=iCache}})
+      (index, Outcome{verdict=Failure, nodesLeft=x, message=msg, finalState=TSPState{currentLocation=(Station "this code" "is terrible"), currentTime=startTime, startTime=startTime, legsSoFar=[], cache=iCache}})
 
   judgePermutations :: OTPImpl a => a -> PermutationTest b Station -> PlanFlagMaker -> UTCTime -> UTCTime -> TimeZoneSeries -> Set.Set Station -> Int -> Int -> IO ()
   judgePermutations otp test planFlags startTime deadline tz set startIndex numToTry = let
@@ -125,7 +130,7 @@ module WhitherTSP where
   judgeEach otp planFlags startTime deadline _ [] _ = return ()
   judgeEach otp planFlags startTime deadline tz (x:xs) iCache = do
     (index, outcome) <- judgePermutation otp planFlags startTime deadline tz x iCache
-    putStrLn (show (index, showOutcomeWithDuration outcome startTime))
+    putStrLn (show (index, showOutcomeWithDuration outcome))
     let newCache = cache $ finalState outcome
     let nextIndex = case (verdict outcome) of Failure -> nextMultiple index (factorial $ nodesLeft outcome)
                                               _ -> index + 1
