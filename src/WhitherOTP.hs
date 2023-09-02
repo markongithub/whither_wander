@@ -27,7 +27,7 @@ convertMillis :: Int -> UTCTime
 convertMillis ms = posixSecondsToUTCTime (fromIntegral $ quot ms 1000)
 
 queryTime :: TimeZoneSeries -> UTCTime -> [(String, String)]
-queryTime tz utc = [("date", formatTime defaultTimeLocale "%Y%m%d" (utcToLocalTime' tz utc)), 
+queryTime tz utc = [("date", formatTime defaultTimeLocale "%Y%m%d" (utcToLocalTime' tz utc)),
                     ("time", formatTime defaultTimeLocale "%H:%M" (utcToLocalTime' tz utc))]
 
 displayTime :: TimeZoneSeries -> UTCTime -> String
