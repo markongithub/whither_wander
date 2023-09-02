@@ -36,9 +36,3 @@ module Main where
   main = do
     (startIndex, numToTry) <- readTwoInts
     mainBruteForce defaultOTP allBARTTests defaultPlanFlags myStartTime myDeadline requiredDestinations startIndex numToTry "/usr/share/zoneinfo/US/Pacific"
-
-
-
-
-
-
