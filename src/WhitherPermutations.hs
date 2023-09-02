@@ -191,3 +191,17 @@ module WhitherPermutations where
   setMustBeginBy set n = PermutationTest { state = OKSoFar (SetMustBeginByState set n)
                                          , func = setMustBeginByFunc }
 
+  setNotAtEnd :: (Ord a, Show a) => Set.Set a -> Int -> PermutationTest (SetMustBeginByState a) a
+  setNotAtEnd set total = setMustBeginBy set (total - Set.size set - 1)
+
+  data SetNotAtBeginningState a = SetNotAtBeginningState (Set.Set a)
+  setNotAtBeginningFunc :: (Ord i, Show i) => TestFunc (SetNotAtBeginningState i) i
+  setNotAtBeginningFunc (SetNotAtBeginningState set) i
+    | Set.member i set = EarlyExit ("The permutation began with the bad set.")
+    | otherwise = Finished
+
+  setNotAtBeginning :: (Ord a, Show a) => Set.Set a -> PermutationTest (SetNotAtBeginningState a) a
+  setNotAtBeginning set = PermutationTest { state = OKSoFar (SetNotAtBeginningState set)
+                                         , func = setNotAtBeginningFunc }
+
+  setNotAtBeginningOrEnd set total = chainTests (setNotAtBeginning set) (setNotAtEnd set total)
