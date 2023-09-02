@@ -20,13 +20,10 @@ module WhitherTSP where
         Failure -> "Failed with " ++ (show $ nodesLeft outcome) ++ " stops left: "
       in intro ++ message outcome
 
-  showOutcomeWithDuration :: Outcome -> String
-  showOutcomeWithDuration outcome = case verdict outcome of
-        Success -> showSuccess
-        Failure -> show outcome
-      where durationSeconds = diffUTCTime (currentTime $ finalState outcome) (startTime $ finalState outcome)
-            durationMinutes = quot (ceiling durationSeconds) 60
-            showSuccess = (show outcome) ++ " (" ++ show durationMinutes ++ " minutes)"
+  durationMinutes :: TSPState -> Int
+  durationMinutes state = let
+      durationSeconds = diffUTCTime (currentTime state) (startTime state)
+      in quot (ceiling durationSeconds) 60
 
 
   data Verdict = Success | Failure deriving (Eq, Show)
@@ -39,7 +36,7 @@ module WhitherTSP where
                            }
 
   instance Show TSPState where
-    show state = ("It is " ++ displayTime cheapUTC (currentTime state) ++ " and we are at " ++ (show $ currentLocation state))
+    show state = ("After " ++ (show $ durationMinutes state) ++ " minutes it is " ++ displayTime cheapUTC (currentTime state) ++ " and we are at " ++ (show $ currentLocation state))
 
   type PlanFlagMaker = TSPState -> [String]
 
@@ -130,7 +127,7 @@ module WhitherTSP where
   judgeEach otp planFlags startTime deadline _ [] _ = return ()
   judgeEach otp planFlags startTime deadline tz (x:xs) iCache = do
     (index, outcome) <- judgePermutation otp planFlags startTime deadline tz x iCache
-    putStrLn (show (index, showOutcomeWithDuration outcome))
+    putStrLn (show (index, outcome))
     let newCache = cache $ finalState outcome
     let nextIndex = case (verdict outcome) of Failure -> nextMultiple index (factorial $ nodesLeft outcome)
                                               _ -> index + 1
