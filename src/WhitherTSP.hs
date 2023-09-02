@@ -38,7 +38,8 @@ module WhitherTSP where
   instance Show TSPState where
     show state = ("After " ++ (show $ durationMinutes state) ++ " minutes it is " ++ displayTime cheapUTC (currentTime state) ++ " and we are at " ++ (show $ currentLocation state))
 
-  type PlanFlagMaker = TSPState -> [(String, String)]
+  type PlanFlag = (String, String)
+  type PlanFlagMaker = TSPState -> [PlanFlag]
 
   followItinerary :: TSPState -> Station -> OTPItinerary -> TSPState
   followItinerary curState nextDestination itin = let
@@ -60,7 +61,7 @@ module WhitherTSP where
   followDestinations0 _ _ [] _ _ state =
     return Outcome {verdict = Success, nodesLeft=0, message=show state, finalState=state}
   followDestinations0 otp planFlags (nextDest:remaining) deadline tz state = do
-    (response, newCache) <- getItineraryAlightingOrNot otp planFlags tz nextDest state
+    (response, newCache) <- getItineraryAlightingOrNot otp (planFlags state) tz nextDest state
     case response of
       Left (OTPError msg) -> return Outcome{
         verdict=Failure, nodesLeft=(1 + length remaining),
@@ -73,7 +74,7 @@ module WhitherTSP where
                              finalState = nextState}
         else followDestinations0 otp planFlags remaining deadline tz nextState
 
-  getItineraryAlightingOrNot :: OTPImpl a => a -> PlanFlagMaker -> TimeZoneSeries -> Station -> TSPState -> IO (OTPItineraryOrNot, ItineraryCache)
+  getItineraryAlightingOrNot :: OTPImpl a => a -> [PlanFlag] -> TimeZoneSeries -> Station -> TSPState -> IO (OTPItineraryOrNot, ItineraryCache)
   -- this sucks
   getItineraryAlightingOrNot otp planFlags tz nextDest state
     | null (legsSoFar state) = runRequest firstRequest
@@ -84,7 +85,7 @@ module WhitherTSP where
           lastBlockID = fromJust (lTripBlockID lastLeg)
           firstLeg itin = head (legs itin)
           stayingOnTrain itin = lMode (firstLeg itin) /= "WALK" && isJust (lTripBlockID $ firstLeg itin) && lastBlockID == fromJust (lTripBlockID $ firstLeg itin)
-          firstRequest = OTPPlanRequest (code $ currentLocation state) (code nextDest) (currentTime state) tz (planFlags state)
+          firstRequest = OTPPlanRequest (code $ currentLocation state) (code nextDest) (currentTime state) tz planFlags
           runRequest r = getFastestItineraryCaching otp r (cache state)
           secondRequest = firstRequest {departureTime = addUTCTime (fromIntegral minTransferTime) (currentTime state)}
           chainedRequests = do
@@ -176,3 +177,29 @@ module WhitherTSP where
     if (numToTry == 1)
       then printTSPAtIndex set otp planFlags startTime deadline tz startIndex
       else judgePermutations otp test planFlags startTime deadline tz set startIndex numToTry
+
+  type Instruction = (Station, [PlanFlag])
+
+  followInstructions :: OTPImpl a => a -> [Instruction] -> UTCTime -> UTCTime -> TimeZoneSeries -> ItineraryCache -> IO Outcome
+  followInstructions otp [] utc deadline tz iCache = error "why would you have no destinations?"
+  followInstructions otp ((startPlace, _):remaining) utc deadline tz iCache =
+    let firstState = TSPState{currentLocation=startPlace, currentTime=utc, legsSoFar=[], cache=iCache, startTime=utc}
+    in followInstructions0 otp remaining deadline tz firstState
+
+  followInstructions0 :: OTPImpl a => a -> [Instruction] -> UTCTime -> TimeZoneSeries -> TSPState -> IO Outcome
+  followInstructions0 _ [] _ _ state =
+    return Outcome {verdict = Success, nodesLeft=0, message=show state, finalState=state}
+  followInstructions0 otp (nextInstruction:remaining) deadline tz state = do
+    let (nextDest, planFlags) = nextInstruction
+    (response, newCache) <- getItineraryAlightingOrNot otp planFlags tz nextDest state
+    case response of
+      Left (OTPError msg) -> return Outcome{
+        verdict=Failure, nodesLeft=(1 + length remaining),
+        message="No route from " ++ (show $ currentLocation state) ++ " to " ++ (show nextDest) ++ " at " ++ displayTime tz (currentTime state), finalState=state{cache=newCache}}
+      Right itinerary -> do
+        let nextState = followItinerary state{cache=newCache} nextDest itinerary
+        if ((currentTime nextState) > deadline)
+        then return Outcome {verdict=Failure, nodesLeft=(1 + length remaining),
+                             message="Ran out of time. " ++ show nextState,
+                             finalState = nextState}
+        else followInstructions0 otp remaining deadline tz nextState
