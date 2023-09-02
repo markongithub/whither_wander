@@ -1,7 +1,7 @@
 name:                whither-wander
 version:             0.1.0.0
 -- synopsis:
--- description:
+description:         is this necessary
 homepage:            https://github.com/markongithub/whither_wander#readme
 license:             BSD3
 license-file:        LICENSE
@@ -17,19 +17,19 @@ library
   exposed-modules:     WhitherPermutations
   hs-source-dirs:      src
   default-language:    Haskell2010
-  build-depends:       aeson, base, binary, bytestring, containers, HTTP, text, time, timezone-olson, timezone-series
+  build-depends:       aeson, base, binary, bytestring, containers, HTTP, http-types, text, time, timezone-olson, timezone-series
 
 executable WhateverSBB
   hs-source-dirs:      src
   main-is:             WhateverSBB.hs
   default-language:    Haskell2010
-  build-depends:       aeson, base, binary, bytestring, containers, HTTP, text, time, timezone-olson, timezone-series
+  build-depends:       aeson, base, binary, bytestring, containers, HTTP, http-types, text, time, timezone-olson, timezone-series
 
 executable WhitherBART
   hs-source-dirs:      src
   main-is:             WhitherBART.hs
   default-language:    Haskell2010
-  build-depends:       aeson, base, binary, bytestring, containers, HTTP, text, time, timezone-olson, timezone-series
+  build-depends:       aeson, base, binary, bytestring, containers, HTTP, http-types, text, time, timezone-olson, timezone-series
 
 test-suite TestWhitherPermutations
   main-is:             TestWhitherPermutations.hs

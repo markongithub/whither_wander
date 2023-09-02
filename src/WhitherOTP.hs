@@ -5,6 +5,7 @@ import Data.Aeson ((.:), (.:?), eitherDecode, FromJSON, parseJSON)
 import Data.Aeson.Key (Key, fromText)
 import Data.Aeson ((.:), (.:?), eitherDecode, FromJSON, parseJSON)
 import Data.Aeson.Types (Object, Value(..))
+import qualified Data.ByteString.Internal as DBI (ByteString, packChars, unpackChars)
 import Data.ByteString.Lazy.Internal (packChars)
 import Data.Char (toLower)
 import Data.List (intercalate, minimumBy)
@@ -16,15 +17,18 @@ import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Time.LocalTime (TimeZone(..), utcToZonedTime)
 import Data.Time.LocalTime.TimeZone.Series (TimeZoneSeries(..), timeZoneFromSeries, utcToLocalTime')
+import Debug.Trace (traceShow)
 import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
+import Network.HTTP.Types.URI (renderQuery)
 
 minTransferTime = 45
 
 convertMillis :: Int -> UTCTime
 convertMillis ms = posixSecondsToUTCTime (fromIntegral $ quot ms 1000)
 
-queryTime :: TimeZoneSeries -> UTCTime -> String
-queryTime tz utc = formatTime defaultTimeLocale "&date=%Y%m%d&time=%H:%M" (utcToLocalTime' tz utc)
+queryTime :: TimeZoneSeries -> UTCTime -> [(String, String)]
+queryTime tz utc = [("date", formatTime defaultTimeLocale "%Y%m%d" (utcToLocalTime' tz utc)), 
+                    ("time", formatTime defaultTimeLocale "%H:%M" (utcToLocalTime' tz utc))]
 
 displayTime :: TimeZoneSeries -> UTCTime -> String
 displayTime tzs utc = let
@@ -47,12 +51,22 @@ data OTPPlanRequest = OTPPlanRequest {
 queryURL :: String -> OTPPlanRequest -> String
 queryURL routerAddress (OTPPlanRequest fromCode toCode travelTime tz planFlags)
   | otherwise = url
-  where url = routerAddress ++ "plan?minTransferTime=" ++ show minTransferTime ++ "&fromPlace=" ++ fromCode ++ "&toPlace=" ++ toCode ++ queryTime tz travelTime ++ extraParams
-        extraParams = "&" ++ intercalate "&" planFlags
+  where url = routerAddress ++ "plan?" ++ query
+        allParams = [
+            makeQueryParam ("minTransferTime", show minTransferTime)
+          , makeQueryParam ("fromPlace", fromCode)
+          , makeQueryParam ("toPlace", toCode)
+          ] ++ map makeQueryParam (queryTime tz travelTime)
+        query = DBI.unpackChars $ renderQuery False allParams
+
+
+makeQueryParam :: (String, String) -> (DBI.ByteString, Maybe DBI.ByteString)
+makeQueryParam (a, b) = (DBI.packChars a, Just $ DBI.packChars b)
 
 getRouteHTTP :: OTPHTTPServer -> OTPPlanRequest -> IO String
 getRouteHTTP (OTPHTTPServer routerAddress) request =
-  let url = queryURL routerAddress request
+  let url2 = queryURL routerAddress request
+      url = traceShow url2 url2
   in simpleHTTP (getRequest url) >>= getResponseBody
 
 class OTPImpl a where
