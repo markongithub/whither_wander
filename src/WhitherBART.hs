@@ -23,9 +23,9 @@ module Main where
   getStation stationName = head $ filter (\s -> name s == stationName) allStations
 
   -- 2300 UTC = 1600 PDT
-  myStartTime = UTCTime (fromGregorian 2023 09 01) (15*60*60 + 0*60)
+  -- myStartTime = UTCTime (fromGregorian 2023 09 05) (15*60*60 + 0*60)
   -- BART is small so this does not matter.
-  myDeadline = addUTCTime (60 * 60 * 25) myStartTime
+  -- myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 
   millbraeTest1 = twoAdjacent (getStation "San Francisco International Airport") (getStation "Millbrae")
   millbraeTest2 = setNotAtBeginningOrEnd (Set.fromList (map getStation ["San Francisco International Airport", "Millbrae"])) (length requiredDestinations)
@@ -34,5 +34,7 @@ module Main where
 
   main :: IO()
   main = do
-    (startIndex, numToTry) <- readTwoInts
-    mainBruteForce defaultOTP allBARTTests defaultPlanFlags myStartTime myDeadline requiredDestinations startIndex numToTry "/usr/share/zoneinfo/US/Pacific"
+    (hour, minute, startIndex, numToTry) <- readFourInts
+    let startTime = UTCTime (fromGregorian 2023 09 05) (60*60*(fromIntegral hour) + 60*(fromIntegral minute))
+    let deadline = addUTCTime (60 * 60 * 6 + 60 * 15) startTime
+    mainBruteForce defaultOTP allBARTTests defaultPlanFlags startTime deadline requiredDestinations startIndex numToTry "/usr/share/zoneinfo/US/Pacific"
