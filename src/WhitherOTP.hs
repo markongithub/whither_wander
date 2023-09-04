@@ -227,12 +227,13 @@ showDeparture tz leg =
       railText = "take train " ++ trainName leg ++ " on " ++ routeDesc leg
       walkText = "start walking toward " ++ (pName $ lTo leg)
       timestamp = timeHeading tz leg
-  in case (lMode leg) of
-    "WALK" -> timestamp ++ commonText ++ walkText
-    "RAIL" -> timestamp ++ commonText ++ railText
-    "TRAM" -> timestamp ++ commonText ++ railText
-    "SUBWAY" -> timestamp ++ commonText ++ railText
-    _      -> ("What the shit is " ++ lMode leg)
+      modeText = case (lMode leg) of
+        "WALK"   -> timestamp ++ commonText ++ walkText
+        "RAIL"   -> timestamp ++ commonText ++ railText
+        "TRAM"   -> timestamp ++ commonText ++ railText
+        "SUBWAY" -> timestamp ++ commonText ++ railText
+        _        -> ("What the shit is " ++ lMode leg)
+  in modeText ++ "."
 
 showArrival :: TimeZoneSeries -> OTPLeg -> String
 showArrival tz leg = (displayTime tz $ lEndTime leg) ++ ": Arrive at " ++ (pName $ lTo leg) ++ "."
@@ -252,8 +253,14 @@ prettyRouteName leg = let
   lineSuffix = if endsInLine then "" else " line"
   in routeNameFromOTP ++ lineSuffix
 
+showHeadSign :: OTPLeg -> String
+showHeadSign leg = case lHeadSign leg of
+  Nothing -> "no head sign"
+  Just hs -> "head sign " ++ hs
+
 routeDesc :: OTPLeg -> String
-routeDesc leg = "the " ++ prettyRouteName leg ++ " with head sign " ++ (fromMaybe "[no head sign]" $ lHeadSign leg)
+routeDesc leg = "the " ++ prettyRouteName leg ++ " with " ++ showHeadSign leg
+
 
 showLegs :: TimeZoneSeries -> [OTPLeg] -> [String]
 showLegs _ [] = []
