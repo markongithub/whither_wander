@@ -180,11 +180,13 @@ module WhitherTSP where
 
   type Instruction = (Station, [PlanFlag])
 
-  followInstructions :: OTPImpl a => a -> [Instruction] -> UTCTime -> UTCTime -> TimeZoneSeries -> ItineraryCache -> IO Outcome
-  followInstructions otp [] utc deadline tz iCache = error "why would you have no destinations?"
-  followInstructions otp ((startPlace, _):remaining) utc deadline tz iCache =
-    let firstState = TSPState{currentLocation=startPlace, currentTime=utc, legsSoFar=[], cache=iCache, startTime=utc}
-    in followInstructions0 otp remaining deadline tz firstState
+  followInstructions :: OTPImpl a => a -> [Instruction] -> UTCTime -> UTCTime -> String -> IO ()
+  followInstructions otp [] utc deadline tzFile = error "why would you have no destinations?"
+  followInstructions otp ((startPlace, _):remaining) utc deadline tzFile = do
+    let firstState = TSPState{currentLocation=startPlace, currentTime=utc, legsSoFar=[], cache=emptyCache, startTime=utc}
+    tz <- getTimeZoneSeriesFromOlsonFile tzFile
+    outcome <- followInstructions0 otp remaining deadline tz firstState
+    putStr $ intercalate "\n" $ showLegs tz $ legsSoFar $ finalState outcome
 
   followInstructions0 :: OTPImpl a => a -> [Instruction] -> UTCTime -> TimeZoneSeries -> TSPState -> IO Outcome
   followInstructions0 _ [] _ _ state =
