@@ -193,6 +193,7 @@ module WhitherTSP where
     tz <- getTimeZoneSeriesFromOlsonFile tzFile
     outcome <- followInstructions0 otp remaining deadline tz firstState
     putStr $ intercalate "\n" $ showLegs tz $ legsSoFar $ finalState outcome
+    putStrLn $ ("\n" ++ message outcome)
 
   followInstructions0 :: OTPImpl a => a -> [Instruction] -> UTCTime -> TimeZoneSeries -> TSPState -> IO Outcome
   followInstructions0 _ [] _ _ state =

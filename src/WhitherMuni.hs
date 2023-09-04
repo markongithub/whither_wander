@@ -41,7 +41,8 @@ From Sunnydale, T to Chinatown, back to Caltrain, N to the rest of the trip.
     , ("Van Ness outbound", "1:16996")
     , ("St. Francis Circle inbound", "1:17109") -- K/M transfers
     , ("St. Francis Circle outbound", "1:16503")
-    , ("Balboa Park", "1:15418") -- hoping this is all we need?
+    , ("Balboa Park JK inbound", "1:15418")
+    , ("Balboa Park M outbound", "1:16262")
     , ("Sunnydale inbound", "1:17398")
     , ("Chinatown", "1:17876")
     , ("Caltrain T inbound", "1:17166")
@@ -54,7 +55,7 @@ From Sunnydale, T to Chinatown, back to Caltrain, N to the rest of the trip.
     candidates = filter (\s -> name s == stationName) allStations
     in (case candidates of
           (x:xs) -> x
-          []     -> error "You spelled a station name wrong again. This getStation thing is moronic.")
+          []     -> error (stationName ++ " is misspelled. This getStation thing is moronic."))
 
   -- 2300 UTC = 1600 PDT
   myStartTime = UTCTime (fromGregorian 2023 09 01) (15*60*60 + 0*60)
@@ -67,6 +68,15 @@ From Sunnydale, T to Chinatown, back to Caltrain, N to the rest of the trip.
     , OTPHop (getStation "Caltrain T outbound") []
     , ForcedTransfer (getStation "Caltrain N inbound") 60
     , OTPHop (getStation "Van Ness outbound") [("preferredRoutes", "1:N")]
+--    , OTPHop (getStation "Balboa Park JK inbound") [("preferredRoutes", "1:J"), ("bannedRoutes", "1:K,1:M")]
+    , OTPHop (getStation "Balboa Park JK inbound") []
+    , ForcedTransfer (getStation "Balboa Park M outbound") 60
+    , OTPHop (getStation "St. Francis Circle inbound") [("preferredRoutes", "1:M"), ("bannedRoutes", "1:J,1:K")]
+    , ForcedTransfer (getStation "St. Francis Circle outbound") 60
+    , OTPHop (getStation "Balboa Park JK inbound") [] -- can do this via any mode
+    , OTPHop (getStation "Van Ness inbound") [("preferredRoutes", "1:J"), ("bannedRoutes", "1:K,1:M")]
+    , ForcedTransfer (getStation "Van Ness outbound") 60
+    , OTPHop (getStation "Ocean Beach outbound") [("preferredRoutes", "1:N")]
     ]
 
   main :: IO()

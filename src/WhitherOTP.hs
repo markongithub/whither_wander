@@ -133,10 +133,12 @@ instance FromJSON OTPItinerary where
                  <*> v .: stringToKey "legs"
   parseJSON _ = mzero
 
-fastestItinerary :: OTPTripPlan -> OTPItinerary
-fastestItinerary plan = let
+fastestItineraryOrError :: OTPTripPlan -> OTPItineraryOrNot
+fastestItineraryOrError plan = let
   faster x y = compare (iEndTime x) (iEndTime y)
-  in minimumBy faster (itineraries plan)
+  in case (itineraries plan) of
+    [] -> Left $ OTPError "We got a plan but no itineraries."
+    xs -> Right $ minimumBy faster (itineraries plan)
 
 type OTPItineraryOrNot = Either OTPError OTPItinerary
 
@@ -145,7 +147,7 @@ getFastestItinerary otp request = do
   response <- getRouteJSON otp request
   let parsed = parseResponse response
   case (plan parsed) of
-    Just rPlan -> return $ Right (fastestItinerary rPlan)
+    Just rPlan -> return $ fastestItineraryOrError rPlan
     _          -> case (otpError parsed) of
                     Just e -> return $ Left e
                     _      -> error "No plan OR error came back from OTP."
