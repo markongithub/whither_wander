@@ -67,7 +67,7 @@ getRouteHTTP :: OTPHTTPServer -> OTPPlanRequest -> IO String
 getRouteHTTP (OTPHTTPServer routerAddress) request =
   let urlQuiet = queryURL routerAddress request
       urlDebug = traceShow urlQuiet urlQuiet
-  in simpleHTTP (getRequest urlQuiet) >>= getResponseBody
+  in simpleHTTP (getRequest urlDebug) >>= getResponseBody
 
 class OTPImpl a where
   getRouteJSON :: a -> OTPPlanRequest -> IO String

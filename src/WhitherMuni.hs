@@ -44,10 +44,17 @@ From Sunnydale, T to Chinatown, back to Caltrain, N to the rest of the trip.
     , ("Balboa Park", "1:15418") -- hoping this is all we need?
     , ("Sunnydale inbound", "1:17398")
     , ("Chinatown", "1:17876")
+    , ("Caltrain T inbound", "1:17166")
+    , ("Caltrain T outbound", "1:17397")
+    , ("Caltrain N inbound", "1:15240")
     ]
 
   getStation :: String -> Station
-  getStation stationName = head $ filter (\s -> name s == stationName) allStations
+  getStation stationName = let
+    candidates = filter (\s -> name s == stationName) allStations
+    in (case candidates of
+          (x:xs) -> x
+          []     -> error "You spelled a station name wrong again. This getStation thing is moronic.")
 
   -- 2300 UTC = 1600 PDT
   myStartTime = UTCTime (fromGregorian 2023 09 01) (15*60*60 + 0*60)
@@ -55,14 +62,13 @@ From Sunnydale, T to Chinatown, back to Caltrain, N to the rest of the trip.
   myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 
   instructions = [
-      (getStation "Sunnydale inbound", [])
-    , (getStation "Chinatown", [])]
+      OTPHop (getStation "Sunnydale inbound") []
+    , OTPHop (getStation "Chinatown") []
+    , OTPHop (getStation "Caltrain T outbound") []
+    , ForcedTransfer (getStation "Caltrain N inbound") 60
+    , OTPHop (getStation "Van Ness outbound") [("preferredRoutes", "1:N")]
+    ]
 
   main :: IO()
   main = do
     followInstructions defaultOTP instructions myStartTime myDeadline "/usr/share/zoneinfo/US/Pacific"
-
-
-
-
-

@@ -83,7 +83,9 @@ module WhitherTSP where
     | otherwise = chainedRequests
     where lastLeg = last (legsSoFar state)
           lastBlockID = fromJust (lTripBlockID lastLeg)
-          firstLeg itin = head (legs itin)
+          firstLeg itin = case (legs itin) of
+            [] -> error "like that guy in Kids the itinery has no legs"
+            (x:xs) -> x
           stayingOnTrain itin = lMode (firstLeg itin) /= "WALK" && isJust (lTripBlockID $ firstLeg itin) && lastBlockID == fromJust (lTripBlockID $ firstLeg itin)
           firstRequest = OTPPlanRequest (code $ currentLocation state) (code nextDest) (currentTime state) tz planFlags
           runRequest r = getFastestItineraryCaching otp r (cache state)
@@ -178,11 +180,15 @@ module WhitherTSP where
       then printTSPAtIndex set otp planFlags startTime deadline tz startIndex
       else judgePermutations otp test planFlags startTime deadline tz set startIndex numToTry
 
-  type Instruction = (Station, [PlanFlag])
+  data Instruction = OTPHop Station [PlanFlag]
+                     | ForcedTransfer Station Int
 
   followInstructions :: OTPImpl a => a -> [Instruction] -> UTCTime -> UTCTime -> String -> IO ()
   followInstructions otp [] utc deadline tzFile = error "why would you have no destinations?"
-  followInstructions otp ((startPlace, _):remaining) utc deadline tzFile = do
+  followInstructions otp (firstInstruction:remaining) utc deadline tzFile = do
+    let startPlace = (case firstInstruction of
+                      OTPHop station _ -> station
+                      ForcedTransfer _ _ -> error "first instruction can't be a transfer")
     let firstState = TSPState{currentLocation=startPlace, currentTime=utc, legsSoFar=[], cache=emptyCache, startTime=utc}
     tz <- getTimeZoneSeriesFromOlsonFile tzFile
     outcome <- followInstructions0 otp remaining deadline tz firstState
@@ -191,17 +197,25 @@ module WhitherTSP where
   followInstructions0 :: OTPImpl a => a -> [Instruction] -> UTCTime -> TimeZoneSeries -> TSPState -> IO Outcome
   followInstructions0 _ [] _ _ state =
     return Outcome {verdict = Success, nodesLeft=0, message=show state, finalState=state}
-  followInstructions0 otp (nextInstruction:remaining) deadline tz state = do
-    let (nextDest, planFlags) = nextInstruction
-    (response, newCache) <- getItineraryAlightingOrNot otp planFlags tz nextDest state
-    case response of
-      Left (OTPError msg) -> return Outcome{
-        verdict=Failure, nodesLeft=(1 + length remaining),
-        message="No route from " ++ (show $ currentLocation state) ++ " to " ++ (show nextDest) ++ " at " ++ displayTime tz (currentTime state), finalState=state{cache=newCache}}
-      Right itinerary -> do
-        let nextState = followItinerary state{cache=newCache} nextDest itinerary
+  followInstructions0 otp (nextInstruction:remaining) deadline tz state =
+    case nextInstruction of
+      OTPHop nextDest planFlags -> do
+        (response, newCache) <- getItineraryAlightingOrNot otp planFlags tz nextDest state
+        case response of
+          Left (OTPError msg) -> return Outcome{
+            verdict=Failure, nodesLeft=(1 + length remaining),
+            message="No route from " ++ (show $ currentLocation state) ++ " to " ++ (show nextDest) ++ " at " ++ displayTime tz (currentTime state), finalState=state{cache=newCache}}
+          Right itinerary -> do
+            let nextState = followItinerary state{cache=newCache} nextDest itinerary
+            if ((currentTime nextState) > deadline)
+            then return Outcome {verdict=Failure, nodesLeft=(1 + length remaining),
+                                message="Ran out of time. " ++ show nextState,
+                                finalState = nextState}
+            else followInstructions0 otp remaining deadline tz nextState
+      ForcedTransfer nextDest duration -> do
+        let nextState = state{currentLocation = nextDest, currentTime = addUTCTime (fromIntegral duration) (currentTime state)}
         if ((currentTime nextState) > deadline)
-        then return Outcome {verdict=Failure, nodesLeft=(1 + length remaining),
-                             message="Ran out of time. " ++ show nextState,
-                             finalState = nextState}
-        else followInstructions0 otp remaining deadline tz nextState
+          then return Outcome {verdict=Failure, nodesLeft=(1 + length remaining),
+                              message="Ran out of time. " ++ show nextState,
+                              finalState = nextState}
+          else followInstructions0 otp remaining deadline tz nextState
