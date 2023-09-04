@@ -54,7 +54,9 @@ From Sunnydale, T to Chinatown, back to Caltrain, N to the rest of the trip.
   -- BART is small so this does not matter.
   myDeadline = addUTCTime (60 * 60 * 25) myStartTime
 
-  instructions = [(getStation "Sunnydale inbound", []) , (getStation "Chinatown", [])]
+  instructions = [
+      (getStation "Sunnydale inbound", [])
+    , (getStation "Chinatown", [])]
 
   main :: IO()
   main = do
